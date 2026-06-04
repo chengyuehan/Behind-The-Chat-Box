@@ -1,0 +1,44 @@
+name: Refresh fuel data
+
+# Rebuilds fuel-data.json from the live LLM Stats sources and commits it.
+# Runs on a schedule (hourly), on demand, and on every push.
+on:
+  schedule:
+    - cron: '0 * * * *'      # top of every hour (UTC) — adjust as you like
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'fuel-data.json'      # avoid a commit loop
+
+permissions:
+  contents: write             # allow the workflow to commit the refreshed snapshot
+
+concurrency:
+  group: refresh-fuel-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build fuel-data.json
+        run: node build-data.js
+
+      - name: Commit if changed
+        run: |
+          if [ -n "$(git status --porcelain fuel-data.json)" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add fuel-data.json
+            git commit -m "chore: refresh fuel-data.json"
+            git push
+          else
+            echo "No data change."
+          fi

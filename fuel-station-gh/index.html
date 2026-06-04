@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>AI Fuel Station</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=DSEG7+Classic:wght@700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-sky-1: #fbe3a8;
+    --bg-sky-2: #e8895a;
+    --bg-sky-3: #9a5248;
+    --bg-sky-4: #3b2a2a;
+    --ground: #2a2118;
+    --asphalt: #1a1410;
+    --kerb: #d9c290;
+    --panel: #241a12;
+    --panel-2: #30231a;
+    --line: rgba(255,255,255,0.08);
+    --text: #f0ecdb;
+    --muted: #8b8775;
+    --led: #dd5e2a;
+    --led-soft: #ffd07a;
+    --led-dim: #4a1f0a;
+    --led-green: #acc257;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f3eee3; color: var(--text); font-family: 'Inter', system-ui, sans-serif; overflow: hidden; height: 100vh; user-select: none; -webkit-user-select: none; }
+  body { display: flex; align-items: center; justify-content: center; }
+
+  #root { width: 100vw; height: 100vh; position: relative; }
+
+  .stage {
+    position: relative;
+    width: 1280px;
+    height: 820px;
+    margin: 0 auto;
+    background:
+      radial-gradient(ellipse 55% 30% at 50% 50%, rgba(255,232,180,0.55) 0%, transparent 65%),
+      radial-gradient(ellipse 90% 30% at 50% 62%, rgba(255,140,80,0.35) 0%, transparent 70%),
+      linear-gradient(180deg,
+        #3b2a2a 0%,
+        #5e3a3a 13%,
+        #9a5248 30%,
+        #d4794f 47%,
+        #f3b27a 60%,
+        #f0a878 68%,
+        #cc7a5c 78%,
+        #7a4a44 89%,
+        #3b2a2a 100%);
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: 0 26px 64px -10px rgba(70,42,20,0.34);
+  }
+  .stage::after {
+    /* vignette */
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+    box-shadow:
+      inset 0 0 140px 30px rgba(0,0,0,0.45),
+      inset 0 -60px 80px rgba(0,0,0,0.4);
+    border-radius: 6px;
+  }
+
+  /* sun + halo */
+  .sun {
+    position: absolute; left: 50%; top: 46%;
+    width: 110px; height: 110px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 50%, #fff8e0 0%, #ffe0a0 38%, #ffb070 65%, rgba(255,140,80,0.0) 78%);
+    box-shadow:
+      0 0 50px 22px rgba(255,210,140,0.5),
+      0 0 140px 50px rgba(255,160,90,0.24);
+    transform: translate(-50%, -50%);
+    z-index: 0;
+  }
+  .sun-rays {
+    position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%);
+    width: 460px; height: 460px; pointer-events: none; z-index: 0;
+    background:
+      conic-gradient(from -10deg,
+        rgba(255,210,140,0) 0deg,
+        rgba(255,220,160,0.10) 5deg,
+        rgba(255,210,140,0) 10deg,
+        rgba(255,210,140,0) 36deg,
+        rgba(255,220,160,0.08) 41deg,
+        rgba(255,210,140,0) 46deg,
+        rgba(255,210,140,0) 90deg,
+        rgba(255,220,160,0.06) 94deg,
+        rgba(255,210,140,0) 98deg,
+        rgba(255,210,140,0) 180deg);
+    mix-blend-mode: screen;
+    opacity: 0.75;
+    border-radius: 50%;
+    mask: radial-gradient(circle, transparent 50px, #000 70px, #000 220px, transparent 230px);
+  }
+
+  /* distant mountains */
+  .mountains {
+    position: absolute; bottom: 245px; left: 0; right: 0; height: 140px;
+    opacity: 0.5;
+    z-index: 0;
+  }
+  .mountains-near {
+    position: absolute; bottom: 235px; left: 0; right: 0; height: 70px;
+    opacity: 0.85;
+    z-index: 0;
+  }
+
+  /* drifting clouds */
+  .clouds { position: absolute; top: 0; left: 0; right: 0; height: 360px; opacity: 0.55; pointer-events: none; z-index: 0; }
+
+  /* warm light pool cast by canopy onto the asphalt */
+  .canopy-glow {
+    position: absolute;
+    top: 130px; left: 50%; transform: translateX(-50%);
+    width: 1240px; height: 700px;
+    background: radial-gradient(ellipse 48% 36% at 50% 75%, rgba(255,210,140,0.18) 0%, rgba(255,180,90,0.08) 35%, transparent 70%);
+    z-index: 1;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  /* ground = paved plaza */
+  .ground {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 260px;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 1px, rgba(255,255,255,0.013) 1px 2px, transparent 2px 6px),
+      linear-gradient(to bottom, #4a3525 0%, #2a1d14 60%, #1a120c 100%);
+    border-top: 3px solid #7a563a;
+    box-shadow: inset 0 8px 18px rgba(0,0,0,0.35);
+  }
+  .road {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 18px, rgba(255,255,255,0.018) 18px 19px),
+      linear-gradient(to bottom, #1a1410 0%, #261c14 100%);
+    border-top: 4px solid #c9b48a;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.04), inset 0 16px 24px rgba(0,0,0,0.4);
+  }
+  .road::after {
+    /* center lane dash */
+    content: ''; position: absolute; left: 0; right: 0; top: 38px; height: 4px;
+    background: repeating-linear-gradient(90deg, rgba(255,210,140,0.4) 0 36px, transparent 36px 72px);
+    opacity: 0.7;
+  }
+
+  /* pump island = concrete platform with curb */
+  .island {
+    position: absolute; bottom: 80px; left: 36px; right: 360px; height: 22px;
+    background: linear-gradient(180deg, #5a4632 0%, #3a2c20 75%, #2a1f15 100%);
+    border-top: 4px solid #d9c290;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.06),
+      0 -6px 14px rgba(0,0,0,0.32),
+      0 4px 10px rgba(0,0,0,0.45);
+    z-index: 1;
+  }
+  .island::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 4px;
+    background: linear-gradient(180deg, #2a1f15, #100a07);
+  }
+
+  /* canopy */
+  .canopy {
+    position: absolute; top: 28px; left: 50%; transform: translateX(-50%);
+    width: 1180px; height: 92px;
+    background:
+      linear-gradient(180deg, #fae5b0 0%, #ecc987 55%, #c69e6b 100%);
+    border-radius: 4px 4px 2px 2px;
+    box-shadow:
+      inset 0 -10px 0 rgba(0,0,0,0.12),
+      inset 0 2px 0 rgba(255,255,255,0.35),
+      0 12px 0 #6a563a,
+      0 22px 36px rgba(0,0,0,0.35),
+      0 36px 80px rgba(255,160,80,0.12);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; letter-spacing: 0.36em; font-size: 24px; color: #3a2a14;
+    white-space: nowrap;
+    z-index: 4;
+  }
+  .canopy::before, .canopy::after {
+    content: ''; position: absolute; bottom: -36px;
+    width: 12px; height: 36px;
+    background: linear-gradient(180deg, #6a563a, #4a3a26);
+    border-radius: 0 0 2px 2px;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+  }
+  .canopy::before { left: 280px; }
+  .canopy::after  { right: 280px; }
+  .canopy .canopy-stripe {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 6px;
+    background: repeating-linear-gradient(90deg, var(--led) 0 36px, #ffd07a 36px 72px);
+    opacity: 0.78;
+  }
+  .canopy .canopy-label {
+    display: inline-flex; align-items: center; gap: 18px;
+  }
+  .canopy .dot { width: 10px; height: 10px; background: #d2452a; border-radius: 50%; box-shadow: 0 0 8px rgba(210,69,42,0.7); }
+  .canopy .canopy-sub { font-size: 11px; letter-spacing: 0.32em; color: #8a6840; font-weight: 500; }
+  .data-tag { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.18em; color: #8b8775; padding: 2px 7px; border: 1px solid rgba(255,255,255,0.12); border-radius: 3px; }
+  .data-tag i { width: 6px; height: 6px; border-radius: 50%; background: #8b8775; }
+  .data-tag.live { color: var(--led-green); border-color: rgba(165,255,93,0.35); }
+  .data-tag.live i { background: var(--led-green); box-shadow: 0 0 7px rgba(165,255,93,0.8); animation: dataPulse 1.6s ease-in-out infinite; }
+  @keyframes dataPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .price-board {
+    position: absolute; top: 50px; right: 16px;
+    width: 260px; padding: 14px 16px 12px;
+    background: #17110b; border-radius: 6px;
+    border: 3px solid #3a2c1c;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    z-index: 5;
+  }
+  .price-board .pb-title {
+    font-size: 10px; letter-spacing: 0.3em; color: #8b8775; margin-bottom: 8px;
+  }
+  .price-board .pb-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.06);
+    gap: 8px; white-space: nowrap;
+  }
+  .price-board .pb-row:last-child { border-bottom: 0; }
+  .price-board .pb-label { color: #ecead8; font-size: 11px; }
+  .price-board .pb-val { color: var(--led); font-size: 13px; text-shadow: 0 0 10px rgba(255,138,61,0.55); }
+
+  /* company selector */
+  .stations-row {
+    position: absolute; top: 160px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 12px; z-index: 4;
+    max-width: 94vw; overflow-x: auto; overflow-y: visible;
+    padding: 6px 8px 10px; scroll-behavior: smooth;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent;
+  }
+  .stations-row::-webkit-scrollbar { height: 6px; }
+  .stations-row::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+  .station-card {
+    flex: 0 0 auto;
+    width: 124px; height: 106px; border-radius: 6px;
+    background: linear-gradient(180deg, #241a12 0%, #15100b 100%);
+    border: 1.5px solid rgba(255,255,255,0.07);
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 6px;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    color: var(--text); padding: 10px 8px 8px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.45);
+  }
+  .station-card:hover { transform: translateY(-3px); }
+  .station-card .brand-glow {
+    position: absolute; top: 0; left: 0; right: 0; height: 64px;
+    background: radial-gradient(ellipse 80% 100% at 50% 0%, var(--brand-tint, rgba(255,138,61,0.18)) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .station-card .brand-strip {
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--brand-color, #ff8a3d);
+    opacity: 0.85;
+  }
+  .station-card.active {
+    border-color: var(--brand-color, #ff8a3d);
+    box-shadow: 0 0 0 2px var(--brand-color, #ff8a3d), 0 0 24px rgba(255,138,61,0.35), 0 14px 26px rgba(0,0,0,0.55);
+    transform: translateY(-5px);
+  }
+  .station-card.active .brand-strip {
+    opacity: 1; height: 4px;
+    box-shadow: 0 0 14px var(--brand-color, #ff8a3d);
+  }
+  .station-card .emblem {
+    width: 40px; height: 40px; margin-top: 4px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; z-index: 1;
+  }
+  .station-card .scname {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #e2dccc;
+    position: relative; z-index: 1;
+  }
+  .station-card .scsub {
+    font-size: 8px; letter-spacing: 0.22em; color: #6a6555;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    position: relative; z-index: 1;
+  }
+  .station-card .pole {
+    position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 26px;
+    background: linear-gradient(180deg, #4a4435, #2a2520);
+  }
+
+  /* pump bay */
+  .pump-bay {
+    position: absolute; left: 70px; width: 760px; bottom: 90px;
+    display: flex; gap: 24px; align-items: flex-end;
+    z-index: 3;
+    overflow-x: auto; overflow-y: visible; padding: 0 8px 10px;
+    scroll-behavior: smooth;
+    scrollbar-width: thin; scrollbar-color: rgba(255,138,61,0.4) transparent;
+  }
+  .pump-bay::-webkit-scrollbar { height: 7px; }
+  .pump-bay::-webkit-scrollbar-thumb { background: rgba(255,138,61,0.4); border-radius: 4px; }
+  .pump {
+    flex: 0 0 auto;
+    width: 158px;
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .pump-body {
+    width: 138px; height: 282px;
+    background:
+      linear-gradient(180deg, var(--pump-color, #2c5fa3) 0%, var(--pump-color-dark, #1e457a) 100%);
+    border-radius: 10px 10px 3px 3px;
+    border: 1.5px solid rgba(0,0,0,0.45);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.18),
+      inset 0 -16px 0 rgba(0,0,0,0.22),
+      inset -3px 0 8px rgba(0,0,0,0.18),
+      0 12px 18px rgba(0,0,0,0.4),
+      0 28px 40px rgba(0,0,0,0.25);
+    padding: 12px 12px 16px;
+    display: flex; flex-direction: column; align-items: center;
+    position: relative;
+  }
+  .pump-body::before {
+    /* brand accent stripe on the left edge */
+    content: ''; position: absolute; left: 6px; top: 18px; bottom: 22px; width: 3px;
+    background: rgba(255,255,255,0.32);
+    border-radius: 2px;
+  }
+  .pump-body::after {
+    /* shine on right edge */
+    content: ''; position: absolute; right: 0; top: 10px; bottom: 16px; width: 4px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 80%);
+    border-radius: 2px;
+  }
+  .pump-top {
+    height: 32px; width: 114px;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.18));
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.35);
+    margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.96);
+    text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+    text-align: center; line-height: 1.12;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+  .screen {
+    width: 114px; height: 96px;
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(255,138,61,0.05) 0%, transparent 70%),
+      #0c0805;
+    border: 2px solid #0a0604;
+    border-radius: 4px;
+    padding: 7px 8px;
+    display: flex; flex-direction: column; gap: 4px;
+    box-shadow:
+      inset 0 0 16px rgba(255,138,61,0.16),
+      inset 0 1px 0 rgba(0,0,0,0.7),
+      0 1px 0 rgba(255,255,255,0.06);
+    position: relative;
+  }
+  .screen::before {
+    /* scan-line overlay */
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.18) 2px 3px);
+    pointer-events: none; border-radius: 4px;
+  }
+  .screen .lbl { font-size: 7px; letter-spacing: 0.22em; color: rgba(255,138,61,0.5); font-weight: 700; }
+  .screen .val {
+    font-family: 'DSEG7 Classic', 'JetBrains Mono', monospace;
+    color: var(--led);
+    text-shadow: 0 0 8px rgba(255,138,61,0.85), 0 0 18px rgba(255,138,61,0.4);
+    font-size: 19px;
+    line-height: 1;
+    text-align: right;
+    letter-spacing: 0.04em;
+    position: relative; z-index: 1;
+  }
+  .screen .val.small { font-size: 12px; opacity: 0.95; }
+  .pump-info {
+    width: 114px; padding: 7px 8px; margin-top: 10px;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.18) 100%);
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.25);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    font-size: 9px; color: rgba(255,255,255,0.95);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .pump-info .row { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; white-space: nowrap; }
+  .pump-info .row .k { opacity: 0.68; letter-spacing: 0.08em; font-size: 8px; }
+  .pump-info .row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; }
+  .pump-base {
+    width: 152px; height: 16px;
+    background:
+      linear-gradient(180deg, #2a221a 0%, #0c0805 100%);
+    border-radius: 0 0 4px 4px;
+    box-shadow:
+      0 4px 0 rgba(0,0,0,0.5),
+      0 8px 14px rgba(0,0,0,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    position: relative;
+  }
+  .pump-base::before, .pump-base::after {
+    content: ''; position: absolute; top: 5px;
+    width: 4px; height: 4px; border-radius: 50%;
+    background: #4a3a26; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.4);
+  }
+  .pump-base::before { left: 12px; }
+  .pump-base::after  { right: 12px; }
+  .nozzle-holster {
+    position: absolute; right: -10px; top: 110px;
+    width: 20px; height: 38px;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.25) 100%);
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.4);
+    box-shadow: inset 0 2px 0 rgba(0,0,0,0.45);
+  }
+
+  /* Nozzle */
+  .nozzle {
+    position: absolute;
+    width: 64px; height: 92px;
+    cursor: grab;
+    z-index: 8;
+    touch-action: none;
+    transition: transform 0.06s ease;
+  }
+  .nozzle.dragging { cursor: grabbing; transition: none; z-index: 30; }
+  .nozzle.pumping { z-index: 25; }
+
+  /* Robot */
+  .robot {
+    position: absolute; right: 110px; bottom: 90px;
+    width: 280px; height: 320px;
+    z-index: 2;
+    animation: robotBob 3.6s ease-in-out infinite;
+  }
+  @keyframes robotBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .robot .shadow {
+    position: absolute; bottom: -14px; left: 50%;
+    transform: translateX(-50%);
+    width: 240px; height: 22px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.6) 0%, transparent 70%);
+    animation: shadowPulse 3.6s ease-in-out infinite;
+  }
+  @keyframes shadowPulse { 0%, 100% { width: 240px; opacity: 0.85; } 50% { width: 222px; opacity: 1; } }
+  .fuel-port {
+    position: absolute;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 35%, #404040 0%, #1a1a1a 60%, #050505 100%);
+    border: 3px solid #c7c0a8;
+    box-shadow:
+      inset 0 0 10px rgba(0,0,0,0.85),
+      inset 0 2px 0 rgba(255,255,255,0.18),
+      0 2px 4px rgba(0,0,0,0.4);
+  }
+  .fuel-port.target {
+    box-shadow:
+      0 0 0 5px rgba(255,138,61,0.45),
+      0 0 28px rgba(255,138,61,0.7),
+      inset 0 0 10px rgba(0,0,0,0.85);
+    animation: pulse 0.9s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 10px rgba(255,138,61,0.22), 0 0 36px rgba(255,138,61,0.95), inset 0 0 10px rgba(0,0,0,0.85); } }
+
+  /* HUD top right */
+  .hud {
+    position: absolute; top: 16px; left: 16px;
+    background:
+      linear-gradient(180deg, rgba(20,16,12,0.85) 0%, rgba(10,8,6,0.82) 100%);
+    border: 1px solid rgba(255,208,122,0.18);
+    border-radius: 8px;
+    padding: 14px 16px;
+    z-index: 6;
+    backdrop-filter: blur(8px);
+    min-width: 256px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.4);
+  }
+  .hud h1 {
+    margin: 0 0 4px; font-size: 13px; letter-spacing: 0.28em; font-weight: 800;
+    color: var(--led-soft);
+    text-shadow: 0 0 12px rgba(255,208,122,0.5);
+  }
+  .hud .sub { font-size: 10px; color: var(--muted); letter-spacing: 0.18em; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; }
+  .hud-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-family: 'JetBrains Mono', monospace; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,0.04); }
+  .hud-row:last-of-type { border-bottom: 0; }
+  .hud-row .k { font-size: 9px; color: var(--muted); letter-spacing: 0.22em; }
+  .hud-row .v { font-size: 15px; font-weight: 800; color: var(--led-soft); text-shadow: 0 0 8px rgba(255,208,122,0.4); }
+
+  /* Tank gauge on robot */
+  .tank-gauge {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    width: 140px; height: 14px;
+    background: #17110b; border: 2px solid #4a4435; border-radius: 8px;
+    overflow: hidden; box-shadow: inset 0 0 6px rgba(0,0,0,0.6);
+  }
+  .tank-fill { height: 100%; background: linear-gradient(90deg, #ff8a3d, #ffd07a); transition: width 0.2s linear; }
+
+  /* SVG hose overlay */
+  .hose-overlay { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+
+  /* tutorial */
+  .toast {
+    position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background:
+      linear-gradient(180deg, rgba(30,22,14,0.95) 0%, rgba(18,12,8,0.95) 100%);
+    color: var(--led-soft);
+    border: 1px solid rgba(255,208,122,0.5);
+    padding: 11px 22px; border-radius: 24px;
+    font-size: 12px; letter-spacing: 0.18em; z-index: 12;
+    font-weight: 600; white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 24px rgba(255,180,90,0.18);
+    text-shadow: 0 0 8px rgba(255,208,122,0.4);
+  }
+  .toast .blink { display: inline-block; color: var(--led); animation: blinkArrow 1.2s ease-in-out infinite; }
+  @keyframes blinkArrow { 50% { transform: translateX(4px); opacity: 0.6; } }
+
+  button { font-family: inherit; }
+
+  .stop-btn {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    background: #c0392b; color: #fff;
+    border: 2px solid #8c2a20;
+    padding: 4px 10px; font-size: 10px; letter-spacing: 0.18em; font-weight: 700;
+    border-radius: 3px; cursor: pointer;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+  }
+  .stop-btn:hover { background: #d44638; }
+
+  .puddle {
+    position: absolute; pointer-events: none;
+    width: 30px; height: 8px; border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(255,138,61,0.7) 0%, rgba(255,138,61,0) 70%);
+  }
+
+  /* fuel droplets streaming during pump */
+  .droplets { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
+  .droplet {
+    fill: var(--led-soft);
+    filter: drop-shadow(0 0 4px rgba(255,200,120,0.7));
+  }
+
+  /* pumping pulse on screen border */
+  .pump.active .pump-body {
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.2),
+      inset 0 -16px 0 rgba(0,0,0,0.22),
+      0 0 0 2px rgba(255,138,61,0.25),
+      0 12px 18px rgba(0,0,0,0.4),
+      0 0 32px rgba(255,138,61,0.18);
+  }
+  .pump.active .pump-top {
+    background: linear-gradient(180deg, rgba(255,138,61,0.32), rgba(255,138,61,0.12));
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255,200,120,0.6);
+  }
+
+  /* ============================================================
+     PAGE LAYOUT — stage stacked over the collection board
+     ============================================================ */
+  html, body { overflow: hidden auto; height: auto; min-height: 100vh; display: block; }
+  body { display: block; }
+  #root { width: 1280px; height: auto; margin: 0 auto; position: static; }
+  .page { width: 1280px; margin: 0 auto; padding: 0 0 40px; }
+  .stage-wrap { display: flex; justify-content: center; align-items: flex-end; overflow: hidden; }
+  .stage { margin: 0 auto; }
+  .dock { display: flex; flex-direction: column; border-radius: 12px; margin-top: 6px; }
+
+  /* ============================================================
+     RECEIPT SLIP (the printed 小票)
+     ============================================================ */
+  .receipt-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(8,5,4,0.62);
+    backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    animation: rcFade 0.18s ease;
+  }
+  @keyframes rcFade { from { opacity: 0; } to { opacity: 1; } }
+  .receipt-slip {
+    width: 372px;
+    background: transparent;
+    filter: drop-shadow(0 26px 50px rgba(0,0,0,0.6));
+    transform-origin: top center;
+    animation: rcPrint 0.5s cubic-bezier(.2,.9,.25,1);
+  }
+  @keyframes rcPrint {
+    0%   { transform: translateY(-46px) scaleY(0.4) rotate(-1deg); opacity: 0; }
+    60%  { opacity: 1; }
+    100% { transform: translateY(0) scaleY(1) rotate(-0.6deg); opacity: 1; }
+  }
+  .rs-perf {
+    height: 12px; background: #f6f1e6;
+    --z: 9px;
+  }
+  .rs-perf-top {
+    -webkit-mask: linear-gradient(#000 0 0) no-repeat;
+    background: #f6f1e6;
+    clip-path: polygon(0 100%, 0 40%, 5% 100%, 10% 40%, 15% 100%, 20% 40%, 25% 100%, 30% 40%, 35% 100%, 40% 40%, 45% 100%, 50% 40%, 55% 100%, 60% 40%, 65% 100%, 70% 40%, 75% 100%, 80% 40%, 85% 100%, 90% 40%, 95% 100%, 100% 40%, 100% 100%);
+  }
+  .rs-perf-bottom {
+    background: #f6f1e6;
+    clip-path: polygon(0 0, 0 60%, 5% 0, 10% 60%, 15% 0, 20% 60%, 25% 0, 30% 60%, 35% 0, 40% 60%, 45% 0, 50% 60%, 55% 0, 60% 60%, 65% 0, 70% 60%, 75% 0, 80% 60%, 85% 0, 90% 60%, 95% 0, 100% 60%, 100% 0);
+  }
+  .rs-body {
+    background:
+      repeating-linear-gradient(0deg, transparent 0 22px, rgba(0,0,0,0.018) 22px 23px),
+      #f6f1e6;
+    padding: 16px 22px 18px;
+    color: #1a1410;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; line-height: 1.5;
+    border-left: 1px solid rgba(0,0,0,0.05);
+    border-right: 1px solid rgba(0,0,0,0.05);
+  }
+  .rs-head { text-align: center; margin-bottom: 8px; }
+  .rs-logo { font-weight: 700; font-size: 14px; letter-spacing: 0.04em; }
+  .rs-sub { font-size: 8px; letter-spacing: 0.12em; color: #6a6052; margin-top: 3px; }
+  .rs-rule { border-top: 1px dashed #9a8f7c; margin: 8px 0; }
+  .rs-line { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 2px 0; }
+  .rs-line > span:first-child { color: #6a6052; letter-spacing: 0.04em; white-space: nowrap; }
+  .rs-line > span:last-child { font-weight: 700; text-align: right; white-space: nowrap; }
+  .rs-strong { color: var(--rc, #1a1410); }
+  .rs-dim { font-size: 9px; color: #8a8070; }
+  .rs-dim > span:first-child { color: #a59a86; }
+  .rs-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-weight: 700; font-size: 13px; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .rs-total-val { font-size: 22px; color: #b8431f; }
+  .rs-meta { text-align: center; font-size: 8px; color: #6a6052; letter-spacing: 0.1em; margin: 8px 0 10px; line-height: 1.8; }
+  .rs-barcode { display: block; margin: 0 auto; }
+  .rs-code { text-align: center; font-size: 9px; letter-spacing: 0.34em; margin-top: 4px; color: #1a1410; }
+
+  .rs-actions { margin-top: 12px; }
+  .rs-dupe {
+    text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.14em; color: var(--led-soft); margin-bottom: 8px;
+  }
+  .rs-btns { display: flex; gap: 8px; }
+  .rs-btns button {
+    flex: 1; padding: 11px 8px; border-radius: 6px; cursor: pointer;
+    font-family: 'Inter', sans-serif; font-weight: 700;
+    font-size: 11px; letter-spacing: 0.14em;
+    transition: transform 0.12s ease, filter 0.12s ease;
+  }
+  .rs-btns button:hover { transform: translateY(-1px); }
+  .rs-discard { flex: 0 0 96px; background: #2a2520; color: #b6ad99; border: 1px solid #4a4435; }
+  .rs-collect {
+    background: linear-gradient(180deg, #ff9a4d, #ef6f24); color: #1a0f06;
+    border: 1px solid #c8531a; box-shadow: 0 0 22px rgba(255,138,61,0.4);
+  }
+
+  /* ============================================================
+     COLLECTION BOARD
+     ============================================================ */
+  .board {
+    background: linear-gradient(180deg, #141925 0%, #0d111a 100%);
+    border: 1px solid rgba(255,208,122,0.14);
+    border-radius: 10px;
+    padding: 18px 22px 22px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .board-head { display: flex; align-items: center; gap: 22px; margin-bottom: 16px; }
+  .board-title { display: flex; flex-direction: column; gap: 3px; }
+  .board-h1 { font-size: 16px; font-weight: 800; letter-spacing: 0.22em; color: var(--led-soft); text-shadow: 0 0 12px rgba(255,208,122,0.4); }
+  .board-h2 { font-size: 10px; letter-spacing: 0.14em; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .board-progress { flex: 1; display: flex; align-items: center; gap: 14px; }
+  .bp-count { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 26px; color: var(--led); text-shadow: 0 0 12px rgba(255,138,61,0.5); line-height: 1; }
+  .bp-of { font-size: 14px; color: var(--muted); }
+  .bp-bar { flex: 1; height: 10px; background: #0a0f17; border: 1px solid #3a2c1c; border-radius: 6px; overflow: hidden; }
+  .bp-fill { height: 100%; background: linear-gradient(90deg, #ff8a3d, #ffd07a); transition: width 0.5s cubic-bezier(.2,.9,.25,1); box-shadow: 0 0 14px rgba(255,138,61,0.5); }
+  .bp-pct { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--muted); white-space: nowrap; }
+  .board-clear {
+    background: #1c2332; color: #8b8775; border: 1px solid #3a2c1c; border-radius: 5px;
+    font-size: 10px; letter-spacing: 0.16em; font-weight: 700; padding: 8px 12px; cursor: pointer;
+  }
+  .board-clear:hover { color: #ecead8; border-color: #3a4a60; }
+
+  /* achievements */
+  .ach-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .ach {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 12px; border-radius: 20px;
+    background: #11151f; border: 1px solid #232b3a;
+    filter: grayscale(1) brightness(0.6); opacity: 0.55;
+    transition: all 0.25s ease;
+  }
+  .ach-ico { font-size: 14px; line-height: 1; }
+  .ach-label { font-size: 9.5px; letter-spacing: 0.14em; font-weight: 700; color: #b6ad99; }
+  .ach-on {
+    filter: none; opacity: 1;
+    background: linear-gradient(180deg, rgba(255,138,61,0.16), rgba(255,138,61,0.04));
+    border-color: rgba(255,138,61,0.55);
+    box-shadow: 0 0 16px rgba(255,138,61,0.18);
+  }
+  .ach-on .ach-label { color: var(--led-soft); }
+
+  .board-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  }
+  .cgroup {
+    background: #0f131c; border: 1px solid #1e2532; border-radius: 8px;
+    padding: 10px 11px 11px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .cgroup-full { border-color: rgba(255,208,122,0.4); box-shadow: inset 0 0 0 1px rgba(255,208,122,0.12); }
+  .cgroup-head { display: flex; align-items: center; gap: 8px; }
+  .cgroup-emblem { display: flex; align-items: center; }
+  .cgroup-name { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #e2dccc; flex: 1; }
+  .cgroup-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: var(--brand, var(--led)); }
+  .cgroup-slots { display: flex; flex-direction: column; gap: 6px; }
+
+  .slot {
+    display: flex; align-items: center; gap: 9px;
+    height: 46px; padding: 0 11px; border-radius: 5px;
+    position: relative; overflow: hidden;
+  }
+  .slot-info { flex: 1; min-width: 0; }
+  .slot-name { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot-meta { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.02em; }
+
+  .slot-empty {
+    border: 1px dashed #3a2c1c; background: repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.012) 6px 12px);
+  }
+  .slot-empty .slot-name { color: #5f6675; }
+  .slot-empty .slot-meta { color: #444b5a; }
+  .slot-lock { color: #3a4150; font-size: 13px; }
+  .slot-stamp { font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.18em; color: #6a5b45; border: 1px solid #3a2c1c; padding: 2px 5px; border-radius: 3px; }
+
+  .slot-filled {
+    background: repeating-linear-gradient(0deg, transparent 0 9px, rgba(0,0,0,0.02) 9px 10px), #f3eddf;
+    color: #1a1410; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    animation: slotPin 0.4s cubic-bezier(.2,.9,.25,1);
+  }
+  @keyframes slotPin { 0% { transform: scale(0.85) rotate(-3deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+  .slot-perf { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--brand, #ff8a3d); }
+  .slot-filled .slot-name { color: #1a1410; }
+  .slot-filled .slot-meta { color: #7a705e; }
+  .slot-total { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; color: #b8431f; }
+
+  /* pin-confirm toast */
+  .pin-toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(180deg, rgba(30,22,14,0.96), rgba(18,12,8,0.96));
+    color: var(--led-soft); border: 1px solid rgba(255,208,122,0.5);
+    padding: 11px 22px; border-radius: 24px; z-index: 210;
+    font-size: 12px; letter-spacing: 0.16em; font-weight: 700;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 24px rgba(255,180,90,0.2);
+    animation: pinToast 1.8s ease forwards;
+  }
+  @keyframes pinToast {
+    0% { opacity: 0; transform: translate(-50%, 12px); }
+    12%, 78% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -8px); }
+  }
+
+  /* ============================================================
+     BRAIN HOVER → ROBOT IQ TOOLTIP
+     ============================================================ */
+  .brain-hot {
+    position: absolute; left: 92px; top: -46px;
+    width: 96px; height: 120px; z-index: 12;
+    cursor: help; border-radius: 50%;
+  }
+  .iq-tip {
+    position: absolute; left: 140px; top: -78px; transform: translateX(-50%);
+    z-index: 40; pointer-events: none;
+    background: linear-gradient(180deg, rgba(30,22,14,0.97), rgba(16,11,8,0.97));
+    border: 1px solid rgba(244,143,192,0.5);
+    border-radius: 10px; padding: 9px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.5), 0 0 22px rgba(244,143,192,0.22);
+    white-space: nowrap;
+    animation: iqPop 0.16s ease;
+  }
+  @keyframes iqPop { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  .iq-tip::after {
+    content: ''; position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%);
+    border: 7px solid transparent; border-top-color: rgba(244,143,192,0.5);
+  }
+  .iq-tip .iq-k { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.28em; color: var(--muted); }
+  .iq-tip .iq-v { font-family: 'DSEG7 Classic', 'JetBrains Mono', monospace; font-size: 28px; color: #f48fc0; text-shadow: 0 0 14px rgba(244,143,192,0.6); line-height: 1; }
+  .iq-tip .iq-v i { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #9a8fa0; font-style: normal; margin-left: 3px; }
+  .iq-tip .iq-sub { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.08em; color: #b6ad99; }
+
+  /* ============================================================
+     CORKBOARD + REAL RECEIPT TICKETS
+     ============================================================ */
+  .index-bar { display: flex; align-items: baseline; gap: 12px; margin: 18px 2px 10px; }
+  .index-title { font-size: 12px; font-weight: 800; letter-spacing: 0.22em; color: var(--led-soft); }
+  .index-sub { font-size: 10px; letter-spacing: 0.1em; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .cork {
+    position: relative;
+    min-height: 224px;
+    margin-top: 4px;
+    border-radius: 8px;
+    padding: 20px 18px 22px;
+    display: flex; flex-wrap: wrap; gap: 14px 16px;
+    align-content: flex-start;
+    background:
+      radial-gradient(circle at 22% 28%, rgba(0,0,0,0.10) 0 2px, transparent 2px),
+      radial-gradient(circle at 70% 65%, rgba(0,0,0,0.08) 0 2px, transparent 2px),
+      repeating-linear-gradient(58deg, rgba(0,0,0,0.05) 0 3px, transparent 3px 7px),
+      repeating-linear-gradient(-58deg, rgba(255,255,255,0.04) 0 3px, transparent 3px 7px),
+      linear-gradient(180deg, #b07d49 0%, #9a6a3c 100%);
+    border: 4px solid #5b3f24;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.34), inset 0 2px 0 rgba(255,255,255,0.12);
+  }
+  .cork-empty {
+    width: 100%; min-height: 184px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em;
+    color: #5b3f24; font-weight: 700; text-align: center;
+    border: 2px dashed rgba(91,63,36,0.6); border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+  }
+
+  .ticket {
+    position: relative;
+    width: 172px;
+    padding-top: 12px;
+    transform: rotate(var(--rot, 0deg));
+    transition: transform 0.18s ease, filter 0.18s ease;
+    animation: ticketDrop 0.45s cubic-bezier(.2,.9,.25,1);
+    filter: drop-shadow(0 10px 14px rgba(0,0,0,0.45));
+  }
+  .ticket:hover { transform: rotate(0deg) translateY(-4px) scale(1.04); z-index: 5; }
+  @keyframes ticketDrop {
+    0% { opacity: 0; transform: rotate(var(--rot,0deg)) translateY(-34px) scale(0.9); }
+    100% { opacity: 1; transform: rotate(var(--rot,0deg)); }
+  }
+  .ticket .pin {
+    position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
+    width: 18px; height: 18px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 35% 32%, #ff8a8a 0 22%, #e23b3b 55%, #9c1f1f 100%);
+    box-shadow: 0 3px 5px rgba(0,0,0,0.5), inset 0 -2px 3px rgba(0,0,0,0.4);
+  }
+  .ticket .pin i {
+    position: absolute; top: 3px; left: 4px; width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+  }
+  .t-perf { height: 8px; background: #f6f1e6; }
+  .t-perf-top {
+    clip-path: polygon(0 100%, 0 50%, 6% 100%, 12% 50%, 18% 100%, 24% 50%, 30% 100%, 36% 50%, 42% 100%, 48% 50%, 54% 100%, 60% 50%, 66% 100%, 72% 50%, 78% 100%, 84% 50%, 90% 100%, 96% 50%, 100% 100%);
+  }
+  .t-perf-bottom {
+    clip-path: polygon(0 0, 0 50%, 6% 0, 12% 50%, 18% 0, 24% 50%, 30% 0, 36% 50%, 42% 0, 48% 50%, 54% 0, 60% 50%, 66% 0, 72% 50%, 78% 0, 84% 50%, 90% 0, 96% 50%, 100% 0);
+  }
+  .t-body {
+    background:
+      repeating-linear-gradient(0deg, transparent 0 16px, rgba(0,0,0,0.02) 16px 17px),
+      #f6f1e6;
+    color: #1a1410; padding: 9px 12px 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.5;
+  }
+  .t-head { text-align: center; font-weight: 700; font-size: 11px; letter-spacing: 0.02em; }
+  .t-sub { text-align: center; font-size: 6.5px; letter-spacing: 0.1em; color: #6a6052; margin-top: 1px; }
+  .t-rule { border-top: 1px dashed #9a8f7c; margin: 6px 0; }
+  .t-grade { text-align: center; font-weight: 700; font-size: 11px; letter-spacing: 0.02em; color: var(--rc, #1a1410); }
+  .t-station { text-align: center; font-size: 7px; letter-spacing: 0.08em; color: #6a6052; margin-top: 2px; }
+  .t-line { display: flex; justify-content: space-between; gap: 8px; }
+  .t-line > span:first-child { color: #6a6052; white-space: nowrap; }
+  .t-line > span:last-child { font-weight: 700; white-space: nowrap; }
+  .t-total { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; letter-spacing: 0.04em; }
+  .t-total-v { font-size: 15px; color: #b8431f; }
+  .t-barcode { display: block; margin: 7px auto 2px; }
+  .t-code { text-align: center; font-size: 6.5px; letter-spacing: 0.14em; color: #1a1410; }
+
+  .ticket { cursor: pointer; }
+  .t-cta {
+    position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%) translateY(4px);
+    background: #1a1410; color: var(--led-soft);
+    font-family: 'JetBrains Mono', monospace; font-size: 7px; letter-spacing: 0.18em; font-weight: 700;
+    padding: 3px 8px; border-radius: 10px; white-space: nowrap;
+    opacity: 0; transition: opacity 0.16s ease, transform 0.16s ease; pointer-events: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  }
+  .ticket:hover .t-cta, .ticket:focus-visible .t-cta { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .ticket:focus-visible { outline: none; }
+  .ticket:focus-visible .t-body { box-shadow: 0 0 0 3px var(--led); }
+
+  /* ============================================================
+     MODEL COMPARISON OVERLAY
+     ============================================================ */
+  /* ============================================================
+     TABBED COLLECTION DOCK
+     ============================================================ */
+  .dock {
+    background: linear-gradient(180deg, #141925 0%, #0d111a 100%);
+    border: 1px solid rgba(255,208,122,0.14);
+    border-radius: 12px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+    overflow: hidden;
+  }
+  .dock-bar {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 18px;
+    padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: linear-gradient(180deg, rgba(255,255,255,0.025), transparent);
+  }
+  .dock-tabs { display: flex; gap: 6px; }
+  .dock-tab {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-radius: 8px; cursor: pointer;
+    background: #11151f; border: 1px solid #232b3a;
+    font-family: 'Inter', sans-serif; font-weight: 700; font-size: 12px; letter-spacing: 0.12em;
+    color: #8b8775; transition: all 0.16s ease;
+  }
+  .dock-tab:hover { color: #ecead8; border-color: #3a4a60; }
+  .dock-tab.on {
+    background: linear-gradient(180deg, rgba(255,138,61,0.18), rgba(255,138,61,0.04));
+    border-color: rgba(255,138,61,0.6); color: var(--led-soft);
+    box-shadow: 0 0 18px rgba(255,138,61,0.16);
+  }
+  .dt-ico { font-size: 15px; line-height: 1; }
+  .dt-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+    background: rgba(0,0,0,0.35); color: var(--led); border-radius: 10px; padding: 1px 7px; min-width: 18px; text-align: center;
+  }
+  .dock-progress { flex: 1; display: flex; align-items: center; gap: 12px; }
+
+  /* output-token slider */
+  .tok-ctrl {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; border-radius: 8px;
+    background: #11151f; border: 1px solid #232b3a; flex: 0 0 auto;
+  }
+  .tok-label { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; color: var(--muted); }
+  .tok-range {
+    -webkit-appearance: none; appearance: none; width: 150px; height: 6px;
+    background: linear-gradient(90deg, #ff8a3d, #ffd07a); border-radius: 4px; outline: none; cursor: pointer;
+  }
+  .tok-range::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #fff2d6 0 28%, #ff9a4d 55%, #ef6f24 100%);
+    border: 1px solid #c8531a; box-shadow: 0 0 10px rgba(255,138,61,0.6); cursor: pointer;
+  }
+  .tok-range::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #fff2d6 0 28%, #ff9a4d 55%, #ef6f24 100%);
+    border: 1px solid #c8531a; box-shadow: 0 0 10px rgba(255,138,61,0.6); cursor: pointer;
+  }
+  .tok-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--led); text-shadow: 0 0 10px rgba(255,138,61,0.4); white-space: nowrap; min-width: 78px; text-align: right; }
+  .tok-val i { font-size: 9px; color: var(--muted); font-style: normal; font-weight: 400; }
+  .tok-conv {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.04em;
+    color: var(--muted); white-space: nowrap;
+    padding-left: 10px; margin-left: 2px; border-left: 1px solid #3a2c1c;
+  }
+  .dock-body { padding: 18px 20px 22px; }
+  .tab-empty {
+    min-height: 200px; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; font-weight: 700;
+    color: var(--muted); text-align: center; padding: 0 30px; line-height: 1.7;
+  }
+
+  /* compare view (inline) */
+  .cmp-note { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: var(--muted); margin-left: auto; }
+
+  /* ============================================================
+     BRAINS TAB — specimen shelf
+     ============================================================ */
+  .brain-view { display: flex; flex-direction: column; gap: 14px; }
+  .brain-shelf {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px;
+  }
+  .specimen {
+    position: relative;
+    background: radial-gradient(120% 90% at 50% 0%, rgba(244,143,192,0.07), transparent 60%), #0f131c;
+    border: 1px solid #1e2532; border-radius: 12px;
+    padding: 16px 12px 13px; display: flex; flex-direction: column; align-items: center; gap: 7px;
+    animation: ticketDrop 0.4s cubic-bezier(.2,.9,.25,1);
+  }
+  .specimen.top { border-color: rgba(255,208,122,0.5); box-shadow: inset 0 0 0 1px rgba(255,208,122,0.18), 0 0 24px rgba(255,180,90,0.12); }
+  .spec-crown {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(180deg, #ffd07a, #ef9f3a); color: #1a0f06;
+    font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700; letter-spacing: 0.12em;
+    padding: 3px 9px; border-radius: 10px; white-space: nowrap; box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  }
+  .jar {
+    position: relative; width: 96px; height: 96px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50% 50% 46% 46%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 0 26px rgba(120,180,255,0.10), inset -8px -8px 22px rgba(0,0,0,0.3);
+    overflow: hidden;
+  }
+  .jar-glow {
+    position: absolute; width: 70%; height: 70%; border-radius: 50%;
+    background: radial-gradient(circle, var(--brain-c, #f48fc0) 0%, transparent 70%);
+    opacity: 0.55; filter: blur(6px);
+  }
+  .jar-brain { font-size: 42px; line-height: 1; filter: drop-shadow(0 0 10px rgba(244,143,192,0.6)); transition: transform 0.4s cubic-bezier(.2,.9,.25,1); z-index: 1; }
+  .jar-lid {
+    position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+    width: 54%; height: 9px; border-radius: 6px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06));
+    border: 1px solid rgba(255,255,255,0.16);
+  }
+  .specimen.genius .jar { box-shadow: inset 0 0 30px rgba(244,143,192,0.3), inset -8px -8px 22px rgba(0,0,0,0.3); border-color: rgba(244,143,192,0.4); }
+  .spec-iq { font-family: 'DSEG7 Classic', 'JetBrains Mono', monospace; font-size: 30px; font-weight: 700; color: #f48fc0; text-shadow: 0 0 14px rgba(244,143,192,0.55); line-height: 1; }
+  .spec-iq i { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #9a8fa0; font-style: normal; margin-left: 2px; }
+  .spec-bar { width: 100%; height: 6px; background: #0a0f17; border: 1px solid #2a2436; border-radius: 4px; overflow: hidden; }
+  .spec-fill { height: 100%; background: linear-gradient(90deg, #c45c93, #f7b6d8); box-shadow: 0 0 10px rgba(244,143,192,0.5); transition: width 0.5s cubic-bezier(.2,.9,.25,1); }
+  .spec-name { font-size: 12px; font-weight: 800; color: #ecead8; text-align: center; line-height: 1.2; }
+  .spec-meta { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.04em; color: var(--muted); text-align: center; }
+  .spec-tier { font-weight: 700; }
+  .spec-tier.genius { color: #f7b6d8; }
+  .spec-tier.advanced { color: #9fe6b4; }
+  .spec-tier.capable { color: #ffd07a; }
+  .spec-tier.basic { color: #8b8775; }
+  .brain-foot { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: var(--muted); text-align: center; padding-top: 4px; }
+
+  .cmp-sortbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .cmp-sortlabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: var(--muted); }
+  .cmp-sortbtn {
+    background: #11151f; color: #8b8775; border: 1px solid #232b3a; border-radius: 16px;
+    font-size: 9.5px; letter-spacing: 0.1em; font-weight: 700; padding: 6px 12px; cursor: pointer;
+    transition: all 0.16s ease;
+  }
+  .cmp-sortbtn:hover { color: #ecead8; }
+  .cmp-sortbtn.on { background: linear-gradient(180deg, rgba(255,138,61,0.2), rgba(255,138,61,0.05)); border-color: rgba(255,138,61,0.6); color: var(--led-soft); }
+
+  .cmp-rows { display: flex; flex-direction: column; gap: 8px; }
+  .cmp-row {
+    display: grid; grid-template-columns: 168px 1fr; gap: 14px; align-items: center;
+    padding: 12px 14px; border-radius: 9px;
+    background: #0f131c; border: 1px solid #1e2532;
+  }
+  .cmp-row.focus { border-color: var(--rc, var(--led)); box-shadow: 0 0 0 1px var(--rc, var(--led)) inset, 0 0 22px rgba(255,138,61,0.12); }
+  .cmp-model { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .cmp-swatch { width: 22px; height: 5px; border-radius: 3px; background: var(--rc, #ff8a3d); margin-bottom: 3px; }
+  .cmp-mname { font-size: 13px; font-weight: 800; letter-spacing: 0.01em; color: #ecead8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmp-mco { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.08em; color: var(--muted); }
+
+  .cmp-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .cmp-metric { display: flex; flex-direction: column; gap: 4px; }
+  .cmp-mlabel { font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.1em; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .cmp-tag { background: rgba(120,220,150,0.16); color: #7ed79a; border: 1px solid rgba(120,220,150,0.4); border-radius: 4px; font-size: 7px; letter-spacing: 0.1em; padding: 1px 4px; }
+  .cmp-track { height: 7px; background: #0a0f17; border: 1px solid #232b3a; border-radius: 5px; overflow: hidden; }
+  .cmp-bar { height: 100%; background: linear-gradient(90deg, var(--rc, #ff8a3d), #ffd07a); border-radius: 4px; transition: width 0.4s cubic-bezier(.2,.9,.25,1); }
+  .cmp-metric.best .cmp-bar { background: linear-gradient(90deg, #5fbf7e, #aee9bf); }
+  .cmp-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #e2dccc; }
+  .cmp-metric.best .cmp-val { color: #9fe6b4; }
+
+  .cmp-foot { padding: 12px 22px 16px; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: var(--muted); border-top: 1px solid rgba(255,255,255,0.05); text-align: center; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel">
+/* ============================================================
+   RECEIPT + COLLECTION SYSTEM
+   Exports to window: ReceiptTicket, ReceiptBoard, AchievementBar,
+   buildAchievements, modelKey
+   ============================================================ */
+(function () {
+  const { useEffect } = React;
+
+  const modelKey = (companyId, modelName) => `${companyId}::${modelName}`;
+
+  const fmtMoney = (n) => '$' + (n < 0.01 ? n.toFixed(6) : n < 1 ? n.toFixed(4) : n.toFixed(2));
+  const fmtTokens = (n) => {
+    if (n < 1000) return n.toFixed(0);
+    if (n < 1_000_000) return (n / 1000).toFixed(2) + 'k';
+    return (n / 1_000_000).toFixed(3) + 'M';
+  };
+
+  const hashInt = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+
+  // deterministic little barcode pattern from a string
+  function barcodeBars(seed, count = 44, height = 34) {
+    let h = hashInt(seed);
+    const bars = [];
+    let x = 0;
+    for (let i = 0; i < count; i++) {
+      const w = 1 + (h % 3);
+      h = (h * 1103515245 + 12345) >>> 0;
+      if ((h & 1) === 1) bars.push(<rect key={i} x={x} y="0" width={w} height={height} fill="#1a1410" />);
+      x += w + 1;
+    }
+    return { bars, width: x, height };
+  }
+
+  // ============================================================
+  // ReceiptTicket — a REAL little thermal receipt, pinned to the board
+  // ============================================================
+  function ReceiptTicket({ receipt, onOpen }) {
+    const bc = barcodeBars(receipt.txid, 34, 20);
+    const rot = ((hashInt(receipt.txid + 'r') % 80) - 40) / 10; // -4°..+4°
+    return (
+      <div
+        className="ticket" role="button" tabIndex={0}
+        style={{ '--rc': receipt.color, '--rot': rot + 'deg' }}
+        title={`${receipt.modelName} — click to compare`}
+        onClick={() => onOpen && onOpen(receipt)}
+        onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onOpen) { e.preventDefault(); onOpen(receipt); } }}
+      >
+        <div className="pin"><i /></div>
+        <div className="t-perf t-perf-top" />
+        <div className="t-body">
+          <div className="t-head">⛽ AI&nbsp;FUEL&nbsp;PLAZA</div>
+          <div className="t-sub">SELF&nbsp;SERVE&nbsp;·&nbsp;TIER&nbsp;1&nbsp;TOKENS</div>
+          <div className="t-rule" />
+          <div className="t-grade">{receipt.modelName.toUpperCase()}</div>
+          <div className="t-station">{receipt.companyName.toUpperCase()}&nbsp;·&nbsp;PUMP&nbsp;#{String(receipt.idx + 1).padStart(2, '0')}</div>
+          <div className="t-rule" />
+          <div className="t-line"><span>INPUT PRICE</span><span>${(receipt.inPrice != null ? receipt.inPrice : receipt.price).toFixed(2)}/M</span></div>
+          <div className="t-line"><span>OUTPUT PRICE</span><span>${receipt.price.toFixed(2)}/M</span></div>
+          <div className="t-line"><span>OUTPUT SPEED</span><span>{receipt.isEstSpeed ? '~' : ''}{receipt.speed} t/s</span></div>
+          <div className="t-line"><span>TOKENS OUT</span><span>{receipt.tokens.toFixed(0)}</span></div>
+          <div className="t-line"><span>FILL TIME</span><span>{receipt.fillTime != null ? receipt.fillTime.toFixed(1) + 's' : '—'}</span></div>
+          <div className="t-rule" />
+          <div className="t-total"><span>TOTAL</span><span className="t-total-v">{fmtMoney(receipt.cost)}</span></div>
+          <svg className="t-barcode" viewBox={`0 0 ${bc.width} ${bc.height}`} width="100%" height={bc.height} preserveAspectRatio="none">{bc.bars}</svg>
+          <div className="t-code">{receipt.dateStr.split('  ')[1]} · {receipt.txid}</div>
+        </div>
+        <div className="t-perf t-perf-bottom" />
+        <div className="t-cta">CLICK&nbsp;TO&nbsp;COMPARE</div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // CompareView — inline model comparison (Compare tab)
+  // ============================================================
+  function CompareView({ receipts, focusKey }) {
+    const [sort, setSort] = React.useState('speed');
+
+    const METRICS = [
+      { id: 'iq', label: 'IQ · LLM STATS', better: 'high', get: (r) => r.iq || 0, fmt: (v) => '' + v },
+      { id: 'inprice', label: 'INPUT PRICE', better: 'low', get: (r) => (r.inPrice != null ? r.inPrice : r.price), fmt: (v) => '$' + v.toFixed(2) + '/M' },
+      { id: 'price', label: 'OUTPUT PRICE', better: 'low', get: (r) => r.price, fmt: (v) => '$' + v.toFixed(2) + '/M' },
+      { id: 'speed', label: 'OUTPUT SPEED', better: 'high', get: (r) => r.speed, fmt: (v, r) => (r && r.isEstSpeed ? '~' : '') + v + ' t/s' },
+      { id: 'cost', label: 'TOTAL / FILL', better: 'low', get: (r) => r.cost, fmt: (v) => fmtMoney(v) },
+    ];
+    const sorter = {
+      iq: (a, b) => (b.iq || 0) - (a.iq || 0),
+      inprice: (a, b) => (a.inPrice != null ? a.inPrice : a.price) - (b.inPrice != null ? b.inPrice : b.price),
+      speed: (a, b) => b.speed - a.speed,
+      price: (a, b) => a.price - b.price,
+      cost: (a, b) => a.cost - b.cost,
+    }[sort];
+
+    if (receipts.length === 0) {
+      return <div className="tab-empty">📊&nbsp;&nbsp;FUEL A FEW MODELS — THEIR SPEED, PRICE &amp; COST LINE UP HERE TO COMPARE</div>;
+    }
+
+    const rows = [...receipts].sort(sorter);
+    const maxes = {};
+    METRICS.forEach((m) => { maxes[m.id] = Math.max(...rows.map((r) => m.get(r)), 1e-9); });
+    const bestOf = (m) => {
+      const vals = rows.map((r) => m.get(r));
+      return m.better === 'high' ? Math.max(...vals) : Math.min(...vals);
+    };
+
+    return (
+      <div className="cmp-view">
+        <div className="cmp-sortbar">
+          <span className="cmp-sortlabel">SORT BY</span>
+          {METRICS.map((m) => (
+            <button key={m.id} className={'cmp-sortbtn' + (sort === m.id ? ' on' : '')} onClick={() => setSort(m.id)}>{m.label}</button>
+          ))}
+          <span className="cmp-note">// live · IQ = LLM Stats Score (TrueSkill across all benchmarks) · real price &amp; speed (~ = est.)</span>
+        </div>
+
+        <div className="cmp-rows">
+          {rows.map((r) => {
+            const key = modelKey(r.companyId, r.modelName);
+            return (
+              <div className={'cmp-row' + (key === focusKey ? ' focus' : '')} key={key} style={{ '--rc': r.color }}>
+                <div className="cmp-model">
+                  <span className="cmp-swatch" />
+                  <span className="cmp-mname">{r.modelName}</span>
+                  <span className="cmp-mco">{r.companyName}</span>
+                </div>
+                <div className="cmp-metrics">
+                  {METRICS.map((m) => {
+                    const v = m.get(r);
+                    const w = Math.max(4, (v / maxes[m.id]) * 100);
+                    const isBest = Math.abs(v - bestOf(m)) < 1e-9;
+                    return (
+                      <div className={'cmp-metric' + (isBest ? ' best' : '')} key={m.id}>
+                        <div className="cmp-mlabel">{m.label}{isBest && <span className="cmp-tag">BEST</span>}</div>
+                        <div className="cmp-track"><div className="cmp-bar" style={{ width: w + '%' }} /></div>
+                        <div className="cmp-val">{m.fmt(v, r)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // BrainsView — collect & compare the robot's brains by IQ (Brains tab)
+  // ============================================================
+  const iqTier = (iq) => iq >= 90 ? { label: 'GENIUS', cls: 'genius' }
+    : iq >= 75 ? { label: 'ADVANCED', cls: 'advanced' }
+    : iq >= 60 ? { label: 'CAPABLE', cls: 'capable' }
+    : { label: 'BASIC', cls: 'basic' };
+
+  function BrainsView({ receipts }) {
+    if (receipts.length === 0) {
+      return <div className="tab-empty">🧠&nbsp;&nbsp;EACH MODEL GROWS THE ROBOT A BRAIN — FUEL UP TO START YOUR SPECIMEN SHELF</div>;
+    }
+    const rows = [...receipts].sort((a, b) => (b.iq || 0) - (a.iq || 0));
+    const topIq = rows[0].iq || 0;
+    return (
+      <div className="brain-view">
+        <div className="brain-shelf">
+          {rows.map((r) => {
+            const iq = r.iq || 0;
+            const tier = iqTier(iq);
+            // map IQ (≈35–100) to a clearly visible size span so the brain SIZE tracks the value
+            const t = Math.max(0, Math.min(1, (iq - 35) / (100 - 35)));
+            const scale = 0.5 + t * 1.15; // ≈0.5 (dim) … 1.65 (genius)
+            const isTop = (iq === topIq);
+            return (
+              <div className={'specimen ' + tier.cls + (isTop ? ' top' : '')} key={modelKey(r.companyId, r.modelName)} style={{ '--rc': r.color }}>
+                {isTop && <div className="spec-crown">👑 SMARTEST</div>}
+                <div className="jar">
+                  <div className="jar-glow" style={{ transform: `scale(${0.7 + t * 0.8})`, opacity: 0.35 + t * 0.45 }} />
+                  <div className="jar-brain" style={{ transform: `scale(${scale})` }}>🧠</div>
+                  <div className="jar-lid" />
+                </div>
+                <div className="spec-iq">{Math.round(iq)}<i>/100</i></div>
+                <div className="spec-bar"><div className="spec-fill" style={{ width: iq + '%' }} /></div>
+                <div className="spec-name">{r.modelName}</div>
+                <div className="spec-meta">{r.companyName} · <span className={'spec-tier ' + tier.cls}>{tier.label}</span></div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="brain-foot">A model's brain power (IQ) reflects its reasoning capability — the smarter the model, the bigger the brain it grows.</div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // AchievementBar
+  // ============================================================
+  function buildAchievements(companies, collected) {
+    const list = Object.values(collected);
+    const n = list.length;
+    const total = companies.reduce((s, c) => s + c.models.length, 0);
+    const brandComplete = companies.some((c) => c.models.every((m) => collected[modelKey(c.id, m.name)]));
+    return [
+      { id: 'first', icon: '🧾', label: 'FIRST FILL', desc: 'Print your first receipt', unlocked: n >= 1 },
+      { id: 'half', icon: '⛽', label: 'HALF TANK', desc: 'Collect 10 models', unlocked: n >= 10 },
+      { id: 'brand', icon: '🏅', label: 'BRAND LOYAL', desc: 'Collect every model from one provider', unlocked: brandComplete },
+      { id: 'speed', icon: '⚡', label: 'SPEED FREAK', desc: 'Collect a 200+ tok/s model', unlocked: list.some((r) => r.speed >= 200) },
+      { id: 'premium', icon: '💎', label: 'PREMIUM POUR', desc: 'Collect a $50+/M model', unlocked: list.some((r) => r.price >= 50) },
+      { id: 'budget', icon: '🪙', label: 'BUDGET RUN', desc: 'Collect a ≤$0.10/M model', unlocked: list.some((r) => r.price <= 0.1) },
+      { id: 'genius', icon: '🧠', label: 'BIG BRAIN', desc: 'Collect a 90+ IQ model', unlocked: list.some((r) => (r.iq || 0) >= 90) },
+      { id: 'all', icon: '👑', label: 'FULL GARAGE', desc: 'Collect every model', unlocked: n >= total && total > 0 },
+    ];
+  }
+
+  function AchievementBar({ achievements }) {
+    return (
+      <div className="ach-bar">
+        {achievements.map((a) => (
+          <div className={'ach' + (a.unlocked ? ' ach-on' : '')} key={a.id} title={a.desc}>
+            <span className="ach-ico">{a.icon}</span>
+            <span className="ach-label">{a.label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ============================================================
+  // ReceiptsView — corkboard of pinned receipts + collection index
+  // ============================================================
+  function ReceiptsView({ companies, receipts, collected, totalCount, collectedCount, achievements, onOpenCompare }) {
+    return (
+      <div className="receipts-view">
+        <AchievementBar achievements={achievements} />
+
+        <div className="cork">
+          {receipts.length === 0 ? (
+            <div className="cork-empty">⛽&nbsp;&nbsp;FUEL THE ROBOT — YOUR RECEIPT PRINTS &amp; PINS ITSELF HERE</div>
+          ) : (
+            receipts.map((r) => <ReceiptTicket key={r.txid} receipt={r} onOpen={onOpenCompare} />)
+          )}
+        </div>
+
+        <div className="index-bar">
+          <span className="index-title">COLLECTION&nbsp;INDEX</span>
+          <span className="index-sub">// {collectedCount} of {totalCount} models fueled at least once</span>
+        </div>
+
+        <div className="board-grid">
+          {companies.map((c) => {
+            const have = c.models.filter((m) => collected[modelKey(c.id, m.name)]).length;
+            const full = have === c.models.length;
+            return (
+              <div className={'cgroup' + (full ? ' cgroup-full' : '')} key={c.id} style={{ '--brand': c.color }}>
+                <div className="cgroup-head">
+                  <span className="cgroup-emblem">{c.emblem(20)}</span>
+                  <span className="cgroup-name">{c.name}</span>
+                  <span className="cgroup-count">{have}/{c.models.length}{full ? ' ★' : ''}</span>
+                </div>
+                <div className="cgroup-slots">
+                  {c.models.map((m) => {
+                    const r = collected[modelKey(c.id, m.name)];
+                    if (!r) {
+                      return (
+                        <div className="slot slot-empty" key={m.name}>
+                          <div className="slot-lock">▢</div>
+                          <div className="slot-info">
+                            <div className="slot-name">{m.name}</div>
+                            <div className="slot-meta">{m.speed} t/s · ${m.price.toFixed(2)}/M</div>
+                          </div>
+                          <div className="slot-stamp">LOCKED</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="slot slot-filled" key={m.name} style={{ '--brand': c.color }} title={`Pinned ${r.dateStr}`}>
+                        <div className="slot-perf" />
+                        <div className="slot-info">
+                          <div className="slot-name">{m.name}</div>
+                          <div className="slot-meta">{r.speed} t/s · ${r.price.toFixed(2)}/M</div>
+                        </div>
+                        <div className="slot-total">{fmtMoney(r.cost)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // BottomDock — tabbed collection hub: Receipts · Compare · Brains
+  // ============================================================
+  function BottomDock(props) {
+    const { companies, receipts, collected, totalCount, collectedCount, achievements,
+            onClear, tab, setTab, compareKey, tokenQuota, onTokenQuota } = props;
+    const pct = totalCount ? Math.round((collectedCount / totalCount) * 100) : 0;
+    const TABS = [
+      { id: 'receipts', icon: '🧾', label: 'RECEIPTS', badge: receipts.length },
+      { id: 'compare', icon: '📊', label: 'COMPARE', badge: receipts.length },
+      { id: 'brains', icon: '🧠', label: 'BRAINS', badge: receipts.length },
+    ];
+    return (
+      <div className="dock">
+        <div className="dock-bar">
+          <div className="dock-tabs">
+            {TABS.map((t) => (
+              <button key={t.id} className={'dock-tab' + (tab === t.id ? ' on' : '')} onClick={() => setTab(t.id)}>
+                <span className="dt-ico">{t.icon}</span>
+                <span className="dt-label">{t.label}</span>
+                {t.badge > 0 && <span className="dt-badge">{t.badge}</span>}
+              </button>
+            ))}
+          </div>
+          <div className="tok-ctrl" title="Output tokens dispensed per fill — changing this clears the board">
+            <span className="tok-label">OUTPUT</span>
+            <input className="tok-range" type="range" min="200" max="8000" step="100"
+              value={tokenQuota} onChange={(e) => onTokenQuota(parseInt(e.target.value, 10))} />
+            <span className="tok-val">{tokenQuota.toLocaleString()}<i> tok</i></span>
+            <span className="tok-conv">≈ {Math.round(tokenQuota * 0.75).toLocaleString()} words</span>
+          </div>
+          <div className="dock-progress">
+            <div className="bp-count">{collectedCount}<span className="bp-of"> / {totalCount}</span></div>
+            <div className="bp-bar"><div className="bp-fill" style={{ width: pct + '%' }} /></div>
+            <div className="bp-pct">{pct}% MODELS</div>
+          </div>
+          <button className="board-clear" onClick={onClear}>CLEAR</button>
+        </div>
+
+        <div className="dock-body">
+          {tab === 'receipts' && (
+            <ReceiptsView companies={companies} receipts={receipts} collected={collected}
+              totalCount={totalCount} collectedCount={collectedCount} achievements={achievements}
+              onOpenCompare={props.onOpenCompare} />
+          )}
+          {tab === 'compare' && <CompareView receipts={receipts} focusKey={compareKey} />}
+          {tab === 'brains' && <BrainsView receipts={receipts} />}
+        </div>
+      </div>
+    );
+  }
+
+  Object.assign(window, { ReceiptTicket, BottomDock, AchievementBar, buildAchievements, modelKey });
+})();
+
+</script>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback, useMemo } = React;
+
+// ============================================================
+// DATA — fetched LIVE at runtime from the local server's /api/fuel-data
+// endpoint (server.js pulls it from the LLM Stats API + throughput telemetry).
+//   REAL: company · model name · input price · output price · IQ · output speed
+//   IQ   = composite of the model's benchmark scores (computed server-side)
+//   SPEED= real 7-day output throughput (tok/s); a few models with no published
+//          telemetry fall back to a price estimate (flagged isEstSpeed → "~est").
+// Visual emblems are ORIGINAL geometric marks (no branded logos).
+// ============================================================
+// Static-first: read the snapshot committed by the GitHub Action (works on GitHub
+// Pages, no server). Falls back to a live server endpoint when one is running.
+const FUEL_API = 'fuel-data.json';
+const FUEL_API_FALLBACK = '/api/fuel-data';
+
+// Original geometric emblems, colour-parametrised. Unknown orgs get a generic mark.
+const EMBLEMS = {
+  openai: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" fill="none" stroke={c} strokeWidth="2.5" /><circle cx="18" cy="18" r="7" fill="none" stroke={c} strokeWidth="2.5" /><circle cx="18" cy="18" r="2.2" fill={c} /></svg>),
+  anthropic: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><polygon points="18,4 30,12 30,24 18,32 6,24 6,12" fill="none" stroke={c} strokeWidth="2.5" strokeLinejoin="round" /><polygon points="18,11 24,15 24,21 18,25 12,21 12,15" fill={c} /></svg>),
+  google: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><polygon points="6,30 18,6 30,30" fill="none" stroke={c} strokeWidth="2.5" strokeLinejoin="round" /><polygon points="14,30 18,18 22,30" fill={c} /></svg>),
+  xai: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><path d="M7 8 L29 28 M29 8 L17 20" stroke={c} strokeWidth="3.2" strokeLinecap="round" fill="none" /></svg>),
+  minimax: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><path d="M6 28 L6 12 L18 22 L30 12 L30 28" fill="none" stroke={c} strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round" /><circle cx="18" cy="9" r="3" fill={c} /></svg>),
+  mistral: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><rect x="6" y="6" width="6" height="6" fill={c} /><rect x="6" y="14" width="6" height="6" fill={c} opacity="0.85" /><rect x="14" y="14" width="6" height="6" fill={c} opacity="0.7" /><rect x="6" y="22" width="6" height="6" fill={c} opacity="0.55" /><rect x="14" y="22" width="6" height="6" fill={c} opacity="0.4" /><rect x="22" y="22" width="6" height="6" fill={c} opacity="0.25" /></svg>),
+  deepseek: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><path d="M6 18 Q 18 4, 30 18 Q 18 32, 6 18 Z" fill="none" stroke={c} strokeWidth="2.5" /><circle cx="22" cy="18" r="4" fill={c} /><circle cx="23.5" cy="16.5" r="1.2" fill="#fff" /></svg>),
+  qwen: (s, c) => (<svg width={s} height={s} viewBox="0 0 36 36"><path d="M10 8 L26 8 L30 14 L22 28 L14 28 L6 14 Z" fill="none" stroke={c} strokeWidth="2.5" strokeLinejoin="round" /><path d="M18 12 L24 22 L12 22 Z" fill={c} /></svg>),
+  alibaba: (s, c) => EMBLEMS.qwen(s, c),
+};
+function genericEmblem(s, c, seed = 0) {
+  const sides = 3 + (seed % 4); // 3..6-gon
+  const pts = Array.from({ length: sides }, (_, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
+    return `${18 + Math.cos(a) * 13},${18 + Math.sin(a) * 13}`;
+  }).join(' ');
+  return (<svg width={s} height={s} viewBox="0 0 36 36"><polygon points={pts} fill="none" stroke={c} strokeWidth="2.5" strokeLinejoin="round" /><circle cx="18" cy="18" r="3" fill={c} /></svg>);
+}
+function emblemFor(id, idx) {
+  const fn = EMBLEMS[id];
+  return (s, c) => (fn ? fn(s, c) : genericEmblem(s, c, idx + (id ? id.length : 0)));
+}
+
+// Map the server's station list → the company shape the UI renders.
+function buildCompanies(stations) {
+  return (stations || []).map((st, idx) => {
+    const body = (st.color && st.color.body) || '#9aa0b5';
+    const dark = (st.color && st.color.dark) || '#4a4f63';
+    const mk = emblemFor(st.id, idx);
+    return {
+      id: st.id,
+      name: st.name,
+      color: body,
+      colorDark: dark,
+      emblem: (s = 36) => mk(s, body),
+      models: (st.models || []).map((m) => ({
+        name: m.name,
+        price: m.price,
+        inPrice: m.inPrice != null ? m.inPrice : m.price,
+        iq: m.iq,
+        speed: m.speed,
+        isEstSpeed: !!m.isEstSpeed,
+      })),
+    };
+  }).filter((c) => c.models.length > 0);
+}
+
+// Minimal fallback shown only if the live endpoint is unreachable.
+const FALLBACK_STATIONS = [
+  { id: 'openai', name: 'OpenAI', color: { body: '#1aa37a', dark: '#0c6a4d' }, models: [
+    { name: 'GPT-5.1', price: 10, inPrice: 1.25, iq: 90, speed: 114 },
+    { name: 'GPT-5 mini', price: 2, inPrice: 0.25, iq: 70, speed: 174 } ] },
+  { id: 'anthropic', name: 'Anthropic', color: { body: '#d97757', dark: '#a14d2f' }, models: [
+    { name: 'Claude Opus 4.6', price: 25, inPrice: 5, iq: 84, speed: 20 },
+    { name: 'Claude Haiku 4.5', price: 5, inPrice: 1, iq: 70, speed: 136 } ] },
+];
+
+// Pump positions are computed at render. Robot fuel port is anchored.
+const STAGE_W = 1280;
+const STAGE_H = 820;
+const TANK_CAP = 100; // arbitrary "fuel" units shown in gauge
+const TANK_TOKENS = 1000; // a FULL fill always dispenses this many output tokens — same for every model
+
+// ============================================================
+// Nozzle SVG (original design)
+// ============================================================
+function NozzleSVG({ color = '#2a2a2a', active = false }) {
+  // origin (0,0) at the trigger pivot near the top — that's the point that follows the cursor.
+  return (
+    <svg width="64" height="92" viewBox="-12 -10 76 102" style={{ overflow: 'visible' }}>
+      {/* hose attach knob — top right */}
+      <circle cx="52" cy="0" r="6" fill="#1a1a1a" />
+      <circle cx="52" cy="0" r="3" fill="#444" />
+      {/* handle */}
+      <path d="M10 0 L 52 0 L 52 14 L 24 14 L 24 30 L 10 30 Z" fill={color} stroke="#0a0a0a" strokeWidth="1.5" strokeLinejoin="round" />
+      {/* grip detail */}
+      <rect x="14" y="4" width="34" height="3" fill="rgba(255,255,255,0.18)" />
+      <rect x="14" y="9" width="34" height="2" fill="rgba(0,0,0,0.25)" />
+      {/* trigger guard */}
+      <path d="M14 14 Q 6 26, 14 34 L 24 34 L 24 30 L 16 30 Q 12 26, 16 22 L 24 22 L 24 14 Z" fill="#1a1a1a" />
+      {/* trigger */}
+      <rect x="16" y="20" width="6" height="10" rx="1" fill="#ddd" />
+      {/* spout barrel */}
+      <rect x="-12" y="2" width="22" height="10" fill={color} stroke="#0a0a0a" strokeWidth="1.5" />
+      {/* spout tip */}
+      <rect x="-12" y="3" width="6" height="8" fill="#888" stroke="#0a0a0a" strokeWidth="1.2" />
+      {/* tip hole */}
+      <circle cx="-10" cy="7" r="1.6" fill="#1a0a04" />
+      {/* active glow */}
+      {active && (
+        <circle cx="-10" cy="7" r="3" fill="#ff8a3d" opacity="0.85">
+          <animate attributeName="opacity" values="0.4;1;0.4" dur="0.6s" repeatCount="indefinite" />
+        </circle>
+      )}
+    </svg>
+  );
+}
+
+// ============================================================
+// Robot (original design)
+// ============================================================
+function Robot({ fuelLevel, brainPower = 0, glowColor = '#ff8a3d' }) {
+  // brain scale: from a tiny bud (0.28) up to a big brain (1.35)
+  const bp = Math.max(0, Math.min(100, brainPower));
+  const scale = 0.28 + (bp / 100) * 1.07;
+  // brain sits on top of the antenna; its bottom stays anchored near y=6, grows upward
+  const brainHalfH = 17 * scale;       // half-height of brain blob at this scale
+  const brainBottomY = 8;              // where the brain's bottom touches antenna
+  const brainCenterY = brainBottomY - brainHalfH;
+  const antennaTopY = brainBottomY + brainHalfH - 2; // antenna meets brain bottom
+  const glowOpacity = 0.25 + (bp / 100) * 0.6;
+  return (
+    <svg viewBox="0 0 280 320" width="280" height="320" style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id="fuelg" x1="0" x2="1">
+          <stop offset="0" stopColor="#ff8a3d" />
+          <stop offset="1" stopColor="#ffd07a" />
+        </linearGradient>
+        <radialGradient id="braing" cx="42%" cy="34%" r="72%">
+          <stop offset="0" stopColor="#ffd9ea" />
+          <stop offset="0.5" stopColor="#f48fc0" />
+          <stop offset="1" stopColor="#c85a96" />
+        </radialGradient>
+      </defs>
+
+      {/* antenna */}
+      <line x1="140" y1="40" x2="140" y2={antennaTopY} stroke="#9aa4b8" strokeWidth="3" />
+
+      {/* ===== BRAIN on the antenna ===== */}
+      <g transform={`translate(140, ${brainCenterY}) scale(${scale})`}>
+        {/* outer glow halo — colour follows the active pump, intensity follows size */}
+        <circle cx="0" cy="0" r="24" fill={glowColor} opacity={glowOpacity * 0.5}
+                style={{ filter: 'blur(6px)' }}>
+          <animate attributeName="opacity" values={`${glowOpacity*0.35};${glowOpacity*0.7};${glowOpacity*0.35}`} dur="1.6s" repeatCount="indefinite" />
+        </circle>
+        {/* brain blob */}
+        <path d="M0,-16 C 9,-19 17,-12 15,-4 C 21,-2 21,8 12,11 C 12,16 3,18 0,13
+                 C -3,18 -12,16 -12,11 C -21,8 -21,-2 -15,-4 C -17,-12 -9,-19 0,-16 Z"
+              fill="url(#braing)" stroke="#a83f78" strokeWidth="1.4" strokeLinejoin="round" />
+        {/* central fissure */}
+        <path d="M0,-15 Q 3,-2 0,12" fill="none" stroke="#a83f78" strokeWidth="1.3" strokeLinecap="round" opacity="0.8" />
+        {/* gyri squiggles — right lobe */}
+        <path d="M3,-11 Q 9,-9 7,-4 Q 12,-2 9,3 Q 13,6 8,9" fill="none" stroke="#b94c84" strokeWidth="1.1" strokeLinecap="round" opacity="0.75" />
+        {/* gyri squiggles — left lobe */}
+        <path d="M-3,-11 Q -9,-9 -7,-4 Q -12,-2 -9,3 Q -13,6 -8,9" fill="none" stroke="#b94c84" strokeWidth="1.1" strokeLinecap="round" opacity="0.75" />
+        {/* highlight */}
+        <ellipse cx="-5" cy="-8" rx="4" ry="3" fill="#fff" opacity="0.5" />
+      </g>
+
+      {/* synapse sparkles while actively fueling */}
+      {fuelLevel > 0 && bp > 4 && (
+        <g>
+          {[[-18,-4],[20,-2],[0,-22],[14,8],[-14,6]].map(([ox, oy], i) => (
+            <circle key={i} cx={140 + ox * scale} cy={brainCenterY + oy * scale} r="1.6" fill={glowColor}>
+              <animate attributeName="opacity" values="0;1;0" dur="1.2s" begin={`${i*0.22}s`} repeatCount="indefinite" />
+            </circle>
+          ))}
+        </g>
+      )}
+
+      {/* head */}
+      <rect x="76" y="40" width="128" height="92" rx="14" fill="#cfd6e4" stroke="#7d8aa6" strokeWidth="3" />
+      <rect x="76" y="40" width="128" height="20" rx="10" fill="#aab4c8" />
+      {/* eyes */}
+      <rect x="96" y="76" width="34" height="34" rx="6" fill="#15202e" />
+      <rect x="150" y="76" width="34" height="34" rx="6" fill="#15202e" />
+      <circle cx={fuelLevel > 0 ? 116 : 113} cy="93" r="6" fill="#ff8a3d">
+        <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <circle cx={fuelLevel > 0 ? 170 : 167} cy="93" r="6" fill="#ff8a3d" />
+      {/* mouth */}
+      <rect x="110" y="118" width="60" height="6" rx="3" fill="#7d8aa6" />
+      {/* neck */}
+      <rect x="120" y="132" width="40" height="14" fill="#7d8aa6" />
+      {/* body */}
+      <rect x="58" y="146" width="164" height="140" rx="10" fill="#dbe1ee" stroke="#7d8aa6" strokeWidth="3" />
+      {/* chest panel */}
+      <rect x="78" y="166" width="124" height="56" rx="4" fill="#17110b" />
+      {/* chest gauge bg */}
+      <rect x="86" y="178" width="108" height="14" rx="3" fill="#1a1410" stroke="#4a4435" strokeWidth="1.5" />
+      <rect x="88" y="180" width={104 * fuelLevel / TANK_CAP} height="10" rx="2" fill="url(#fuelg)" />
+      {/* tank readout */}
+      <text x="140" y="212" textAnchor="middle" fontFamily="'JetBrains Mono', monospace" fontSize="10" fill="#ff8a3d" letterSpacing="2">
+        TANK {fuelLevel.toFixed(0).padStart(3, '0')}/{TANK_CAP}
+      </text>
+      {/* arms */}
+      <rect x="38" y="158" width="22" height="80" rx="6" fill="#cfd6e4" stroke="#7d8aa6" strokeWidth="3" />
+      <rect x="220" y="158" width="22" height="80" rx="6" fill="#cfd6e4" stroke="#7d8aa6" strokeWidth="3" />
+      <circle cx="49" cy="246" r="14" fill="#aab4c8" stroke="#7d8aa6" strokeWidth="3" />
+      <circle cx="231" cy="246" r="14" fill="#aab4c8" stroke="#7d8aa6" strokeWidth="3" />
+      {/* legs */}
+      <rect x="92" y="286" width="36" height="24" rx="4" fill="#7d8aa6" />
+      <rect x="152" y="286" width="36" height="24" rx="4" fill="#7d8aa6" />
+      {/* fuel port label arrow */}
+      <text x="248" y="200" fontSize="9" fill="#4a4435" fontFamily="'JetBrains Mono', monospace" letterSpacing="1">↘</text>
+    </svg>
+  );
+}
+
+// ============================================================
+// Hose SVG: cubic Bézier from pump nozzle anchor → nozzle tip
+// ============================================================
+function Hose({ from, to, color, active, idKey }) {
+  if (!from || !to) return null;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const sag = Math.min(120, 40 + Math.abs(dx) * 0.18 + Math.max(0, dy) * 0.2);
+  const c1 = { x: from.x + dx * 0.25, y: from.y + sag };
+  const c2 = { x: from.x + dx * 0.75, y: to.y + sag * 0.7 };
+  const d = `M ${from.x} ${from.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${to.x} ${to.y}`;
+  const pathId = `hose-${idKey}`;
+  return (
+    <g>
+      <path id={pathId} d={d} stroke="#0a0a0a" strokeWidth="10" fill="none" strokeLinecap="round" />
+      <path d={d} stroke={color} strokeWidth="7" fill="none" strokeLinecap="round" opacity="0.92" />
+      <path d={d} stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      {active && (
+        <g className="droplet">
+          {[0, 0.25, 0.5, 0.75].map((begin, i) => (
+            <circle key={i} r="3.2" fill="#ffd07a">
+              <animateMotion dur="0.9s" begin={`${begin}s`} repeatCount="indefinite">
+                <mpath href={`#${pathId}`} />
+              </animateMotion>
+              <animate attributeName="opacity" values="0;1;1;0.3" dur="0.9s" begin={`${begin}s`} repeatCount="indefinite" />
+            </circle>
+          ))}
+        </g>
+      )}
+    </g>
+  );
+}
+
+// ============================================================
+// Mountains backdrop
+// ============================================================
+const MountainsSVG = () => (
+  <svg className="mountains" viewBox="0 0 1280 140" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="mtnFar" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stopColor="#5a3a4a" />
+        <stop offset="1" stopColor="#3a2a3a" />
+      </linearGradient>
+      <linearGradient id="mtnMid" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stopColor="#7a4858" />
+        <stop offset="1" stopColor="#4a2a3a" />
+      </linearGradient>
+    </defs>
+    <path d="M0 110 L 120 50 L 220 80 L 340 30 L 460 70 L 600 20 L 760 60 L 900 25 L 1060 65 L 1180 35 L 1280 70 L 1280 140 L 0 140 Z" fill="url(#mtnFar)" />
+    <path d="M0 120 L 100 80 L 240 95 L 380 70 L 540 100 L 700 75 L 880 95 L 1060 80 L 1200 100 L 1280 90 L 1280 140 L 0 140 Z" fill="url(#mtnMid)" opacity="0.85" />
+  </svg>
+);
+
+const MountainsNearSVG = () => (
+  <svg className="mountains-near" viewBox="0 0 1280 70" preserveAspectRatio="none">
+    <path d="M0 70 L 0 36 Q 80 18, 180 28 T 380 22 T 600 34 T 820 18 T 1060 30 T 1280 22 L 1280 70 Z" fill="#1f1218" />
+  </svg>
+);
+
+const CloudsSVG = () => (
+  <svg className="clouds" viewBox="0 0 1280 360" preserveAspectRatio="none">
+    <g fill="#f5d8a2" opacity="0.4">
+      <ellipse cx="180" cy="180" rx="110" ry="6" />
+      <ellipse cx="260" cy="172" rx="60" ry="4" />
+      <ellipse cx="680" cy="150" rx="140" ry="5" />
+      <ellipse cx="820" cy="158" rx="60" ry="3" />
+      <ellipse cx="1050" cy="200" rx="100" ry="5" />
+      <ellipse cx="420" cy="230" rx="80" ry="3.5" />
+    </g>
+    <g fill="#fff2c8" opacity="0.3">
+      <ellipse cx="310" cy="260" rx="160" ry="4" />
+      <ellipse cx="940" cy="285" rx="180" ry="4" />
+    </g>
+  </svg>
+);
+
+// ============================================================
+// Main App
+// ============================================================
+function App() {
+  // station line-up comes LIVE from the server; fallback shown until it loads
+  const [companies, setCompanies] = useState(() => buildCompanies(FALLBACK_STATIONS));
+  const [companyId, setCompanyId] = useState(() => buildCompanies(FALLBACK_STATIONS)[0].id);
+  const company = useMemo(
+    () => companies.find(c => c.id === companyId) || companies[0],
+    [companies, companyId]
+  );
+  const palette = { body: company.color, dark: company.colorDark };
+
+  // active pumping session: { modelIdx, tokens, cost }
+  const [session, setSession] = useState(null); // { idx, tokens, cost, startedAt }
+  // robot tank level (units 0..TANK_CAP)
+  const [fuelLevel, setFuelLevel] = useState(0);
+  // robot brain power (units 0..100) — grows toward the capability of the model fueling it
+  const [brainPower, setBrainPower] = useState(0);
+  // last model the robot drank — drives the IQ tooltip on brain hover
+  const [lastModel, setLastModel] = useState(null); // { name, iq }
+  const [iqHover, setIqHover] = useState(false);
+
+  // ---- receipt board + collection ----
+  const STORE_KEY = 'aifuel_board_v3';
+  const [collected, setCollected] = useState(() => {
+    try { return (JSON.parse(localStorage.getItem(STORE_KEY)) || {}).collected || {}; } catch (e) { return {}; }
+  });
+  const [receipts, setReceipts] = useState(() => {
+    try { return (JSON.parse(localStorage.getItem(STORE_KEY)) || {}).receipts || []; } catch (e) { return []; }
+  });
+  const [pinToast, setPinToast] = useState('');
+  const [compareKey, setCompareKey] = useState(null); // model key highlighted in the Compare tab
+  const [tab, setTab] = useState('receipts'); // bottom dock tab: receipts | compare | brains
+  // per-fill output token quota — controlled by the slider. Drives tokens out,
+  // cost & fill time (NOT IQ). Changing it wipes the receipt board.
+  const [tokenQuota, setTokenQuota] = useState(() => {
+    try { return (JSON.parse(localStorage.getItem(STORE_KEY)) || {}).tokenQuota || TANK_TOKENS; } catch (e) { return TANK_TOKENS; }
+  });
+  const tokenQuotaRef = useRef(tokenQuota);
+  tokenQuotaRef.current = tokenQuota;
+  useEffect(() => {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ collected, receipts, tokenQuota })); } catch (e) {}
+  }, [collected, receipts, tokenQuota]);
+
+  // LIVE data: pull the real, current catalogue from our server on load.
+  // The server fetches LLM Stats + throughput telemetry (no browser CORS).
+  const [dataLive, setDataLive] = useState(false);
+  const [dataInfo, setDataInfo] = useState(null); // { modelCount, updatedAt }
+  useEffect(() => {
+    let alive = true;
+    const load = (url) => fetch(url, { cache: 'no-store' }).then((res) => (res.ok ? res.json() : Promise.reject(res.status)));
+    load(FUEL_API)
+      .catch(() => load(FUEL_API_FALLBACK)) // local dev server, if the snapshot is absent
+      .then((data) => {
+        if (!alive || !data || !data.stations) return;
+        const fresh = buildCompanies(data.stations);
+        if (!fresh.length) return;
+        setCompanies(fresh);
+        setCompanyId((cur) => (fresh.find((c) => c.id === cur) ? cur : fresh[0].id));
+        setDataLive(!!data.live);
+        setDataInfo({ modelCount: data.modelCount, updatedAt: data.updatedAt });
+      })
+      .catch(() => { /* keep fallback line-up */ });
+    return () => { alive = false; };
+  }, []);
+
+  const totalModels = useMemo(() => companies.reduce((s, c) => s + c.models.length, 0), [companies]);
+  const collectedCount = useMemo(() => Object.keys(collected).length, [collected]);
+  const achievements = useMemo(() => buildAchievements(companies, collected), [collected, companies]);
+
+  // build a printed receipt from a finished session
+  const makeReceipt = useCallback((sess) => {
+    if (!sess || sess.tokens < 5) return null;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}  ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const txid = (Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36)).toUpperCase().slice(-9);
+    // A full fill is a fixed token quota for EVERY model — the robot always needs
+    // the same number of output tokens to fill up. What differs per model is the
+    // FILL TIME (driven by speed) and the TOTAL (driven by price).
+    const tokens = tokenQuotaRef.current;
+    const cost = (tokens / 1_000_000) * sess.price;
+    const fillTime = tokens / sess.speed; // seconds
+    return {
+      companyId: sess.companyId, companyName: sess.companyName,
+      idx: sess.idx, modelName: sess.modelName,
+      speed: sess.speed, isEstSpeed: sess.isEstSpeed, price: sess.price, inPrice: sess.inPrice, iq: sess.iq,
+      tokens, cost, fillTime,
+      color: sess.color, dateStr, txid,
+    };
+  }, []);
+
+  // end the active session. A receipt only prints when the tank is FULLY filled
+  // (completed === true). A mid-fill stop / switch just ends and resets — no receipt.
+  // Each model prints at most ONE receipt: a repeat fill updates the existing one in place.
+  const finishSession = useCallback((sess, completed) => {
+    setSession(null);
+    setFuelLevel(0);          // auto-reset the tank after every fill
+    if (!completed) return;
+    const r = makeReceipt(sess);
+    if (!r) return;
+    const key = modelKey(r.companyId, r.modelName);
+    const isNew = !collected[key];
+    setReceipts((prev) => [r, ...prev.filter((x) => modelKey(x.companyId, x.modelName) !== key)]);
+    setCollected((prev) => ({ ...prev, [key]: r }));
+    setBrainPower(r.iq);      // robot keeps the IQ of what it just drank
+    setLastModel({ name: r.modelName, iq: r.iq });
+    setPinToast((isNew ? 'RECEIPT PRINTED ✓  ' : 'RECEIPT UPDATED ✓  ') + r.modelName.toUpperCase());
+    setTimeout(() => setPinToast(''), 1900);
+  }, [makeReceipt, collected]);
+
+  const clearBoard = useCallback(() => {
+    if (window.confirm('Clear the receipt board and collection?')) { setReceipts([]); setCollected({}); }
+  }, []);
+
+  // changing the output token amount invalidates every printed receipt → wipe the board
+  const changeTokenQuota = useCallback((v) => {
+    setTokenQuota(v);
+    setReceipts([]);
+    setCollected({});
+    setSession(null);
+    setFuelLevel(0);
+  }, []);
+
+
+  // drag state per pump-index
+  const [drag, setDrag] = useState(null); // { idx, pos: {x,y}, offset:{x,y} } in stage coords
+  const dragRef = useRef(null);
+  // when pumping, store the nozzle's anchor position so the hose visually attaches to port
+  const [overPort, setOverPort] = useState(false);
+
+  const stageRef = useRef(null);
+  const portRef = useRef(null);
+
+  // Keep the scene at full width (no side letterboxing). Instead of scaling it
+  // down — which would make it narrower than the page and reveal black bars —
+  // we cap the visible height and crop a little of the bottom ground so the
+  // dock's tab bar still fits. The robot + pumps sit well above the crop line.
+  const [vh, setVh] = useState(typeof window !== 'undefined' ? window.innerHeight : 900);
+  useEffect(() => {
+    const on = () => setVh(window.innerHeight);
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  const stageWrapH = Math.max(520, Math.min(STAGE_H, vh - 86)); // reserve ~86px for the tab bar
+  const scaleRef = useRef(1); // scene is unscaled (1:1), so drag math is unaffected
+  scaleRef.current = 1;
+
+  // pump anchor positions (where the hose exits the pump body) in stage coords
+  const [pumpAnchors, setPumpAnchors] = useState({});
+  // nozzle holster positions (rest position of nozzle when not in use) per pump idx
+  const [holsterPositions, setHolsterPositions] = useState({});
+
+  // measure pump positions (in stage space). getBoundingClientRect is in viewport
+  // coords, so this stays correct even when the pump bay is scrolled horizontally.
+  const measurePumps = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const stageBox = stage.getBoundingClientRect();
+    const s = scaleRef.current;
+    // The pump bay scrolls horizontally and clips overflowing pumps, but the nozzles
+    // are drawn in the stage (so they can be dragged out). Only record anchors for
+    // pumps that are actually inside the bay's visible viewport — otherwise a
+    // scrolled-out pump's nozzle would float over the robot.
+    const bay = stage.querySelector('.pump-bay');
+    const bayBox = bay ? bay.getBoundingClientRect() : stageBox;
+    const anchors = {};
+    const rest = {};
+    company.models.forEach((_m, i) => {
+      const pumpEl = stage.querySelector(`[data-pump-idx="${i}"]`);
+      const holEl  = stage.querySelector(`[data-holster-idx="${i}"]`);
+      if (!pumpEl || !holEl) return;
+      const hb = holEl.getBoundingClientRect();
+      // gate on the NOZZLE (holster) being inside the bay's visible band — a pump can
+      // straddle the edge with its holster in the clipped region, which would float
+      // the nozzle over the robot.
+      const holCenter = (hb.left + hb.right) / 2;
+      if (holCenter < bayBox.left + 4 || holCenter > bayBox.right - 4) return;
+      const pb = pumpEl.getBoundingClientRect();
+      anchors[i] = { x: (pb.right - stageBox.left) / s - 4, y: (pb.top - stageBox.top) / s + 90 };
+      rest[i] = { x: (hb.left - stageBox.left) / s - 24, y: (hb.top - stageBox.top) / s - 12 };
+    });
+    setPumpAnchors(anchors);
+    setHolsterPositions(rest);
+  }, [company]);
+  useEffect(() => { measurePumps(); }, [measurePumps, companyId, stageWrapH, companies]);
+
+  // port position
+  const getPortCenter = useCallback(() => {
+    const stage = stageRef.current;
+    const port  = portRef.current;
+    if (!stage || !port) return null;
+    const sb = stage.getBoundingClientRect();
+    const pb = port.getBoundingClientRect();
+    const s = scaleRef.current;
+    return { x: (pb.left - sb.left) / s + (pb.width / s) / 2, y: (pb.top - sb.top) / s + (pb.height / s) / 2 };
+  }, []);
+
+  const distToPort = useCallback((p) => {
+    const c = getPortCenter();
+    if (!c || !p) return Infinity;
+    const dx = c.x - p.x, dy = c.y - p.y;
+    return Math.hypot(dx, dy);
+  }, [getPortCenter]);
+
+  // pointer handlers (on stage)
+  const onPointerMove = useCallback((e) => {
+    const cur = dragRef.current;
+    if (!cur) return;
+    const sb = stageRef.current.getBoundingClientRect();
+    const s = scaleRef.current;
+    const x = (e.clientX - sb.left) / s - cur.offset.x;
+    const y = (e.clientY - sb.top)  / s - cur.offset.y;
+    cur.pos = { x, y };
+    setDrag(d => d ? { ...d, pos: { x, y } } : d);
+    // check proximity to fuel port (using the spout tip area; tip is near top-left of div)
+    setOverPort(distToPort({ x: x + 0, y: y + 7 }) < 44);
+  }, [distToPort]);
+
+  const onPointerUp = useCallback(() => {
+    const cur = dragRef.current;
+    if (!cur) return;
+    const tip = cur.pos ? { x: cur.pos.x, y: cur.pos.y + 7 } : null;
+    if (tip && distToPort(tip) < 44) {
+      const idx = cur.idx;
+      const m = company.models[idx];
+      // fresh fill: empty the tank and let the brain re-grow from scratch
+      setFuelLevel(0);
+      setBrainPower(0);
+      setSession({
+        idx, tokens: 0, cost: 0, startedAt: performance.now(),
+        companyId: company.id, companyName: company.name,
+        modelName: m.name, speed: m.speed, isEstSpeed: m.isEstSpeed, price: m.price, inPrice: m.inPrice, iq: m.iq, color: palette.body,
+      });
+    }
+    dragRef.current = null;
+    setDrag(null);
+    setOverPort(false);
+  }, [distToPort, company, palette]);
+
+  useEffect(() => {
+    if (!drag) return;
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup',   onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup',   onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [drag, onPointerMove, onPointerUp]);
+
+  // pumping loop: tick session.tokens & cost based on model speed/price
+  useEffect(() => {
+    if (!session) return;
+    const model = company.models[session.idx];
+    let last = performance.now();
+    const id = setInterval(() => {
+      const now = performance.now();
+      const dt = (now - last) / 1000;
+      last = now;
+      const deltaTokens = model.speed * dt;
+      const deltaCost   = (deltaTokens / 1_000_000) * model.price;
+      setSession(s => s ? { ...s, tokens: s.tokens + deltaTokens, cost: s.cost + deltaCost } : s);
+      setFuelLevel(f => Math.min(TANK_CAP, f + deltaTokens * (TANK_CAP / tokenQuotaRef.current))); // full tank = the chosen token quota
+      // brain growth: rate ∝ model capability, capped by capability ceiling.
+      // stronger model => grows faster AND reaches a bigger brain.
+      const ceiling = model.iq;
+      const rate = (model.iq / 100) * 26; // units per second
+      setBrainPower(b => b < ceiling ? Math.min(ceiling, b + rate * dt) : b);
+    }, 60);
+    return () => clearInterval(id);
+  }, [session && session.idx, company]); // eslint-disable-line
+
+  // auto-stop if tank full
+  useEffect(() => {
+    if (fuelLevel >= TANK_CAP && session) {
+      finishSession(session, true); // tank full → fill complete → print receipt
+    }
+  }, [fuelLevel, session, finishSession]);
+
+  const stopPump = () => finishSession(session, false); // manual lift-off — no receipt
+
+  // begin drag
+  const beginDrag = (idx, e) => {
+    e.preventDefault();
+    const sb = stageRef.current.getBoundingClientRect();
+    const target = e.currentTarget.getBoundingClientRect();
+    const s = scaleRef.current;
+    // offset: pointer location relative to nozzle origin (stage space)
+    const offset = { x: (e.clientX - target.left) / s, y: (e.clientY - target.top) / s };
+    // initial nozzle pos at current location (stage space)
+    const pos = { x: (target.left - sb.left) / s, y: (target.top - sb.top) / s };
+    const d = { idx, pos, offset };
+    dragRef.current = d;
+    setDrag(d);
+    // if currently pumping this pump, lift the nozzle off mid-fill — no receipt
+    if (session && session.idx === idx) finishSession(session, false);
+  };
+
+  // ----------------------------------------------------------
+  // RENDER
+  // ----------------------------------------------------------
+
+  // nozzle position resolver
+  const nozzlePos = (idx) => {
+    if (drag && drag.idx === idx)        return drag.pos;
+    if (session && session.idx === idx) {
+      const port = getPortCenter();
+      if (port) return { x: port.x - 0, y: port.y - 7 };
+    }
+    return holsterPositions[idx] || { x: -200, y: -200 };
+  };
+
+  const hoseFor = (idx) => {
+    const from = pumpAnchors[idx];
+    const np = nozzlePos(idx);
+    if (!from || !np) return null;
+    // hose connects from pump anchor to the nozzle's "knob" location
+    const to = { x: np.x + 52, y: np.y + 0 };
+    return { from, to, color: palette.body };
+  };
+
+  const fmtMoney = (n) => '$' + n.toFixed(n < 0.01 ? 6 : n < 1 ? 4 : 2);
+  const fmtTokens = (n) => {
+    if (n < 1000) return n.toFixed(0);
+    if (n < 1_000_000) return (n/1000).toFixed(2) + 'k';
+    return (n/1_000_000).toFixed(3) + 'M';
+  };
+
+  return (
+    <div className="page">
+    <div className="stage-wrap" style={{ height: stageWrapH }}>
+    <div className="stage" ref={stageRef}>
+      {/* sky atmosphere */}
+      <div className="sun-rays" />
+      <div className="sun" />
+      <CloudsSVG />
+      <MountainsSVG />
+      <MountainsNearSVG />
+      <div className="ground" />
+      <div className="road" />
+      <div className="island" />
+      <div className="canopy-glow" />
+
+      {/* canopy */}
+      <div className="canopy">
+        <div className="canopy-label">
+          <span className="dot" />
+          <span>AI&nbsp;&nbsp;FUEL&nbsp;&nbsp;PLAZA</span>
+          <span className="canopy-sub">·&nbsp;24H&nbsp;·&nbsp;TIER&nbsp;1&nbsp;·</span>
+          <span className={'data-tag' + (dataLive ? ' live' : '')} title={dataLive ? ('Live from LLM Stats · ' + (dataInfo ? dataInfo.modelCount + ' models · ' + new Date(dataInfo.updatedAt).toLocaleTimeString() : '')) : 'Server unreachable — showing fallback'}>
+            <i />{dataLive ? ('LIVE · ' + (dataInfo ? dataInfo.modelCount + ' MODELS' : '')) : 'OFFLINE'}
+          </span>
+        </div>
+        <div className="canopy-stripe" />
+      </div>
+
+      {/* station selector */}
+      <div className="stations-row">
+        {companies.map(c => {
+          const tint = `${c.color}33`; // 20% alpha-ish
+          return (
+          <div
+            key={c.id}
+            className={'station-card' + (c.id === companyId ? ' active' : '')}
+            onClick={(e) => { finishSession(session, false); setCompanyId(c.id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest' }); }}
+            style={{ '--brand-color': c.color, '--brand-tint': tint }}
+          >
+            <div className="brand-strip" />
+            <div className="brand-glow" />
+            <div className="emblem">{c.emblem(40)}</div>
+            <div className="scname">{c.name}</div>
+            <div className="scsub">{c.models.length} PUMPS</div>
+            <div className="pole" />
+          </div>
+        )})}
+      </div>
+
+      {/* pump bay */}
+      <div className="pump-bay" onScroll={measurePumps}>
+        {company.models.map((m, i) => {
+          const isPumping = session && session.idx === i;
+          const sessTokens = isPumping ? session.tokens : 0;
+          const sessCost   = isPumping ? session.cost   : 0;
+          return (
+            <div className={'pump' + (isPumping ? ' active' : '')} key={m.name} data-pump-idx={i}>
+              <div className="pump-body" style={{ '--pump-color': palette.body, '--pump-color-dark': palette.dark }}>
+                <div className="pump-top">{m.name.toUpperCase()}</div>
+                <div className="screen">
+                  <div style={{display:'flex', justifyContent:'space-between'}}>
+                    <span className="lbl">PRICE</span>
+                    <span className="lbl">USD</span>
+                  </div>
+                  <div className="val">{sessCost < 1 ? sessCost.toFixed(4) : sessCost.toFixed(2)}</div>
+                  <div style={{display:'flex', justifyContent:'space-between'}}>
+                    <span className="lbl">TOKENS</span>
+                    <span className="lbl">OUT</span>
+                  </div>
+                  <div className="val small">{sessTokens.toFixed(0).padStart(7,'0')}</div>
+                </div>
+                <div className="pump-info">
+                  <div className="row"><span className="k">SPEED</span><span className="v" title={m.isEstSpeed ? 'estimated — no published telemetry' : 'real 7-day throughput'}>{m.isEstSpeed ? '~' : ''}{m.speed} t/s</span></div>
+                  <div className="row"><span className="k">OUT</span><span className="v">${m.price.toFixed(2)}/M</span></div>
+                  <div className="row"><span className="k">IN</span><span className="v">${m.inPrice.toFixed(2)}/M</span></div>
+                  <div className="row"><span className="k">IQ</span><span className="v" style={{color:'#f8b4d6'}} title="LLM Stats Score — composite TrueSkill rating across every tracked benchmark">{m.iq}</span></div>
+                </div>
+                <div className="nozzle-holster" data-holster-idx={i} />
+                {isPumping && <button className="stop-btn" onClick={stopPump}>STOP</button>}
+              </div>
+              <div className="pump-base" />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Robot + fuel port */}
+      <div className="robot">
+        <Robot fuelLevel={fuelLevel} brainPower={brainPower} glowColor={palette.body} />
+        <div className="shadow" />
+        {/* hover zone over the brain → shows the robot's IQ */}
+        <div
+          className="brain-hot"
+          onMouseEnter={() => setIqHover(true)}
+          onMouseLeave={() => setIqHover(false)}
+        />
+        {iqHover && (
+          <div className="iq-tip">
+            <span className="iq-k">ROBOT&nbsp;IQ</span>
+            <span className="iq-v">{Math.round(brainPower)}<i>/100</i></span>
+            {lastModel
+              ? <span className="iq-sub">fueled by {lastModel.name}</span>
+              : <span className="iq-sub">tank empty — go fuel up</span>}
+          </div>
+        )}
+        <div
+          ref={portRef}
+          className={'fuel-port' + ((drag && overPort) ? ' target' : '')}
+          style={{ left: 8, top: 178 }}
+        />
+      </div>
+
+      {/* SVG hose overlay */}
+      <svg className="hose-overlay" viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} preserveAspectRatio="none">
+        {company.models.map((_m, i) => {
+          const h = hoseFor(i);
+          if (!h) return null;
+          const isActive = session && session.idx === i;
+          return <Hose key={i} idKey={`${companyId}-${i}`} from={h.from} to={h.to} color={h.color} active={isActive} />;
+        })}
+      </svg>
+
+      {/* Nozzles (rendered absolutely over everything) */}
+      {company.models.map((_m, i) => {
+        const pos = nozzlePos(i);
+        if (!pos) return null;
+        const isDrag = drag && drag.idx === i;
+        const isPump = session && session.idx === i;
+        return (
+          <div
+            key={i}
+            className={'nozzle' + (isDrag ? ' dragging' : '') + (isPump ? ' pumping' : '')}
+            style={{ left: pos.x, top: pos.y }}
+            onPointerDown={(e) => beginDrag(i, e)}
+          >
+            <NozzleSVG color={palette.dark} active={isPump} />
+          </div>
+        );
+      })}
+
+      {/* toast */}
+      {!session && !drag && (
+        <div className="toast">
+          DRAG A NOZZLE <span className="blink">→</span> ROBOT FUEL PORT · TAP A STATION TO SWITCH
+        </div>
+      )}
+    </div>
+    </div>
+
+      {/* ===== Receipt board below the scene ===== */}
+      {/* ===== Tabbed collection dock below the scene ===== */}
+      <BottomDock
+        companies={companies}
+        receipts={receipts}
+        collected={collected}
+        totalCount={totalModels}
+        collectedCount={collectedCount}
+        achievements={achievements}
+        onClear={clearBoard}
+        tab={tab}
+        setTab={setTab}
+        compareKey={compareKey}
+        tokenQuota={tokenQuota}
+        onTokenQuota={changeTokenQuota}
+        onOpenCompare={(r) => { setCompareKey(modelKey(r.companyId, r.modelName)); setTab('compare'); }}
+      />
+
+      {pinToast && <div className="pin-toast">{pinToast}</div>}
+    </div>
+  );
+}
+
+// idempotent mount — reuse the root if this script ever re-executes (avoids the
+// "createRoot() on a container that has already been passed" dev warning).
+const _rootEl = document.getElementById('root');
+const _root = _rootEl.__fuelRoot || (_rootEl.__fuelRoot = ReactDOM.createRoot(_rootEl));
+_root.render(<App />);
+
+</script>
+<template id="__bundler_thumbnail" data-bg-color="#0d111a">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0d111a"/>
+    <!-- fuel pump body -->
+    <rect x="430" y="250" width="200" height="320" rx="16" fill="#1a2030" stroke="#ff8a3d" stroke-width="6"/>
+    <rect x="460" y="290" width="140" height="90" rx="8" fill="#0a0f17" stroke="#3a4a60" stroke-width="3"/>
+    <text x="530" y="350" font-family="monospace" font-size="44" font-weight="700" fill="#ff8a3d" text-anchor="middle">$0.00</text>
+    <!-- nozzle -->
+    <rect x="600" y="430" width="120" height="26" rx="13" fill="#ff8a3d"/>
+    <circle cx="740" cy="443" r="22" fill="#ef6f24"/>
+    <!-- receipt -->
+    <rect x="690" y="500" width="150" height="200" rx="6" fill="#f6f1e6" transform="rotate(6 765 600)"/>
+    <line x1="715" y1="545" x2="815" y2="545" stroke="#9a8f7c" stroke-width="3" stroke-dasharray="6 5" transform="rotate(6 765 600)"/>
+    <line x1="715" y1="580" x2="815" y2="580" stroke="#9a8f7c" stroke-width="3" stroke-dasharray="6 5" transform="rotate(6 765 600)"/>
+    <line x1="715" y1="615" x2="815" y2="615" stroke="#9a8f7c" stroke-width="3" stroke-dasharray="6 5" transform="rotate(6 765 600)"/>
+    <!-- fuel drop -->
+    <path d="M380 560 C 380 530 410 510 410 480 C 410 510 440 530 440 560 C 440 590 410 605 410 605 C 410 605 380 590 380 560 Z" fill="#ffd07a"/>
+    <text x="600" y="160" font-family="monospace" font-size="64" font-weight="700" fill="#ffd07a" text-anchor="middle" letter-spacing="6">⛽ AI FUEL</text>
+  </svg>
+</template>
+</body>
+</html>

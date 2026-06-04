@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>From 1 to 2,000,000,000,000 — a tour through LLM parameter counts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3eee3;
+    --ink: #161512;
+    --ink-soft: #5b574f;
+    --muted: #9d978a;
+    --line: #d6cfbe;
+    --accent: #c54a2c;
+    --grid: #cdc6b4;
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); }
+  body { min-height: 100vh; padding: 56px 40px 120px; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 600; }
+
+  /* ───── Header ───── */
+  header.page-head {
+    max-width: 1280px;
+    margin: 0 auto 56px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 32px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+  h1.headline {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(36px, 5vw, 72px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  h1.headline em { font-style: italic; color: var(--accent); }
+  .deck {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 18px 0 0;
+    line-height: 1.4;
+  }
+  .datasrc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 16px 0 0;
+  }
+  .datasrc .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted); flex: none;
+  }
+  .datasrc.is-live .dot { background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+  .datasrc.is-snapshot .dot { background: var(--muted); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Variation tabs */
+  .tabs {
+    display: inline-flex;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+  }
+  .tab {
+    appearance: none;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 11px 14px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .tab:last-child { border-right: none; }
+  .tab:hover { background: rgba(0,0,0,0.04); }
+  .tab.active { background: var(--ink); color: var(--bg); }
+
+  /* ───── Variation block container ───── */
+  .stage {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .variation-caption {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .variation-caption .label-num { color: var(--accent); margin-right: 8px; }
+  .variation-caption .desc { font-family: var(--serif); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink-soft); }
+
+  /* ───── Filter bar ───── */
+  .filterbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 18px;
+    margin: 0 0 22px;
+    flex-wrap: wrap;
+  }
+  .filter-field { display: flex; flex-direction: column; gap: 6px; }
+  .filter-field label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .filter-field input,
+  .filter-field select {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    padding: 8px 10px;
+    min-width: 180px;
+    cursor: pointer;
+  }
+  .filter-field input { cursor: text; }
+  .filter-field input:focus,
+  .filter-field select:focus { outline: none; border-color: var(--ink); }
+  .filter-clear {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 9px 14px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .filter-clear:hover { background: rgba(0,0,0,0.05); }
+  .filter-count {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin-left: auto;
+    padding-bottom: 9px;
+  }
+  .empty-msg { font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--ink-soft); padding: 28px 0; }
+
+  /* Fold groups (V1) */
+  .v1-group-head { cursor: pointer; }
+  .v1-group-head:hover { background: rgba(0,0,0,0.035); border-radius: 2px; }
+  .v1-caret {
+    display: inline-block;
+    color: var(--accent);
+    font-size: 11px;
+    margin-right: 8px;
+    transition: transform 0.15s;
+  }
+  .v1-group-head.is-open .v1-caret { transform: rotate(90deg); }
+  .v1-group-count { font-weight: 600; }
+  .v1-group-kids {
+    margin: -2px 0 4px 9px;
+    padding: 4px 0 4px 22px;
+    border-left: 2px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .v1-kid { font-family: var(--sans); font-size: 12.5px; color: var(--ink); }
+
+  /* ═════════════════════════════════════ V1 — Dot leader ═════════════════════════════════════ */
+  .view-v1 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .v1-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 20px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .v1-field {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: pre;
+    color: var(--ink);
+    letter-spacing: 0;
+  }
+  .v1-dots {
+    color: var(--muted);
+    opacity: 0.85;
+  }
+  .v1-num {
+    font-weight: 500;
+  }
+  .v1-label {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v1-label-name { font-weight: 500; }
+  .v1-label-org { color: var(--muted); }
+  .v1-label-year { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  /* Media markers — interleaved among the models on the same number line.
+     Horizontal margin/padding cancel so the dot field stays column-aligned. */
+  .v1-row.is-media {
+    background: rgba(197, 74, 44, 0.07);
+    border-radius: 2px;
+    padding: 7px 10px;
+    margin: 2px -10px;
+  }
+  .v1-row.is-media .v1-dots { color: var(--accent); opacity: 0.38; }
+  .v1-row.is-media .v1-num { color: var(--accent); font-weight: 600; }
+  .v1-media-emoji { font-size: 18px; line-height: 1; margin-right: 9px; }
+  .v1-media-name {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 17px;
+    color: var(--accent);
+    margin-right: 11px;
+  }
+  .v1-media-cap {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ═════════════════════════════════════ V3 — Media-count matrix ═════════════════════════════════════ */
+  .view-v3 { overflow-x: auto; }
+  .v3-table { min-width: 920px; display: flex; flex-direction: column; }
+  .v3-head, .v3-row {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.6fr) 130px repeat(5, 1fr);
+    align-items: center;
+    gap: 18px;
+  }
+  .v3-head {
+    padding: 4px 0 14px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .v3-row {
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .v3-h-lab {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .v3-h-lab.r { text-align: right; }
+  .v3-h-media {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    gap: 3px;
+  }
+  .v3-h-emoji { font-size: 22px; line-height: 1; }
+  .v3-h-name { font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-soft); line-height: 1.05; }
+  .v3-h-cap { font-family: var(--mono); font-size: 9px; letter-spacing: 0.03em; color: var(--muted); }
+  .v3-c-model { font-family: var(--sans); font-size: 13px; }
+  .v3-c-model .nm { font-weight: 600; }
+  .v3-c-params {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    text-align: right;
+    color: var(--ink);
+  }
+  .v3-c-count {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    text-align: right;
+    color: var(--ink);
+  }
+  .v3-c-count.zero { color: var(--muted); opacity: 0.45; }
+
+  /* Footer */
+  .footnotes {
+    max-width: 1280px;
+    margin: 80px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+  .footnotes strong { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 900px) {
+    body { padding: 32px 20px 80px; }
+    header.page-head { grid-template-columns: 1fr; }
+    .v1-row { grid-template-columns: 1fr; gap: 4px; }
+    .v1-label, .v1-media { width: auto; min-width: 0; }
+    .v1-media { justify-content: flex-start; flex-wrap: wrap; }
+    .view-v3 { overflow-x: auto; }
+  }
+  /* ═════════════════════════════════════ Growth timeline ═════════════════════════════════════ */
+  .view-timeline { overflow-x: auto; padding-bottom: 8px; }
+  .tl-plot { position: relative; margin: 0 auto; }
+  .tl-svg { position: absolute; inset: 0; overflow: visible; }
+  .tl-gridline { stroke: var(--grid); stroke-width: 1; }
+  .tl-grid-minor { opacity: 0.32; stroke-dasharray: 1 5; }
+  .tl-axis { stroke: var(--line); stroke-width: 1; }
+  .tl-bookline { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.55; }
+  .tl-frontier { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .tl-leader { stroke: var(--muted); stroke-width: 1; opacity: 0.5; }
+  .tl-dot { fill: var(--muted); }
+  .tl-dot-record { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+  .tl-year {
+    position: absolute;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+  }
+  .tl-ytick {
+    position: absolute;
+    transform: translateY(-50%);
+    right: 100%;
+    margin-right: 10px;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .tl-book {
+    position: absolute;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--accent);
+    line-height: 1.05;
+    background: var(--bg);
+    padding: 1px 7px 1px 4px;
+    border-radius: 3px;
+  }
+  .tl-book .tl-book-tok {
+    display: block;
+    font-family: var(--mono);
+    font-style: normal;
+    font-size: 9.5px;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+  .tl-lab {
+    position: absolute;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .tl-lab .nm { font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--ink); }
+  .tl-lab .sz { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-left: 5px; }
+  .tl-lab.left { text-align: right; }
+</style>
+</head>
+<body>
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">A scale primer · LLM parameters</p>
+      <h1 class="headline">From <em>1</em> to <em id="headline-max">2,000,000,000,000</em>.</h1>
+      <p class="deck">Every weight in a neural network is a single number. How many numbers is that? Here each parameter count shares one line with the <em>tokens</em> of text in books you know — convert a book's word count to tokens (≈4/3 each) and it becomes a plain number you can set right beside a model. From a single page to the Library of Congress.</p>
+      <p class="datasrc" id="datasrc"><span class="dot"></span><span id="datasrc-text">Connecting to LLM Stats API…</span></p>
+    </div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button class="tab active" data-v="1">01 · Dot leader</button>
+      <button class="tab" data-v="2">02 · Growth</button>
+      <button class="tab" data-v="3" data-comment-anchor="14d27b507d-button">03 · Book count</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="filterbar" id="filterbar">
+      <div class="filter-field">
+        <label for="f-q">Search</label>
+        <input type="text" id="f-q" placeholder="model or company…" autocomplete="off" />
+      </div>
+      <div class="filter-field">
+        <label for="f-org">Company</label>
+        <select id="f-org"><option value="">All companies</option></select>
+      </div>
+      <div class="filter-field">
+        <label for="f-year">Year</label>
+        <select id="f-year"><option value="">All years</option></select>
+      </div>
+      <button class="filter-clear" id="f-clear" type="button">Clear</button>
+      <span class="filter-count" id="f-count"></span>
+    </div>
+    <div class="variation-caption">
+      <div id="cap-title"><span class="label-num">01</span>Dot leader</div>
+      <div class="desc" id="cap-desc">A single fixed-width row per model. Dots fill leftward; the number sits at the right. Each extra digit (each ×10) eats one more dot from the left — the "carry" is the visualization.</div>
+    </div>
+    <div id="root"></div>
+  </main>
+
+  <div class="footnotes">
+    <strong>METHOD</strong> · Model parameter counts, release dates, and organizations are pulled <strong>live from the <a href="https://docs.llm-stats.com/api-reference/introduction" style="color:inherit">LLM Stats API</a></strong> (<span id="fn-meta">loading…</span>). Only models with a disclosed <code>param_count</code> are shown; for MoE models that figure is the total. Variant families (Base / Instruct / Thinking …) are collapsed to their earliest representative. Book figures use published word counts converted to tokens at ≈4/3 tokens per word — Gatsby 47K words · Moby-Dick 206K · War and Peace 587K · Harry Potter series 1.08M · Encyclopædia Britannica 44M · English Wikipedia 4.7B · Library of Congress ~1.7T words.
+  </div>
+
+  <script>
+// LLM parameter dataset — from the LLM Stats API (stats catalog).
+//   docs: https://docs.llm-stats.com/api-reference/introduction
+//   data: param_count · release_date · organization · open_weight
+// param_count lives only on the `stats` catalog, which blocks cross-origin browser
+// requests (CORS), so a static page can't fetch it live — this baked snapshot is the
+// data source. It's accurate (parameter counts never change); re-bake for new models.
+
+// Atomic conceptual anchor — not a real model, kept to ground the scale at 1.
+window.ONE_PARAM = { name: "one parameter", params: 1, year: null, org: null, note: "the atomic unit — a single weight" };
+
+// Recent snapshot baked from the API: every model with a disclosed param_count,
+// with variant families (Base/Instruct/Thinking…) collapsed to one representative.
+window.MODELS_SNAPSHOT = [{"name": "Qwen3.5-0.8B", "params": 800000000, "year": 2026, "date": "2026-03-02", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Gemma 3 1B", "params": 1000000000, "year": 2025, "date": "2025-03-12", "org": "Google", "open": true}, {"name": "DeepSeek R1 Distill Qwen 1.5B", "params": 1780000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "Gemma 3n E2B Instructed LiteRT (Preview)", "params": 1910000000, "year": 2025, "date": "2025-05-20", "org": "Google", "open": true}, {"name": "Gemma 3n E4B Instructed LiteRT Preview", "params": 1910000000, "year": 2025, "date": "2025-05-20", "org": "Google", "open": true}, {"name": "Qwen3.5-2B", "params": 2000000000, "year": 2026, "date": "2026-03-02", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "DeepSeek VL2 Tiny", "params": 3000000000, "year": 2024, "date": "2024-12-13", "org": "DeepSeek", "open": true}, {"name": "Min istral 3 (3B Reasoning 2512)", "params": 3000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Ministral 3 (3B Base 2512)", "params": 3000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Ministral 3 (3B Instruct 2512)", "params": 3000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Llama 3.2 3B Instruct", "params": 3210000000, "year": 2024, "date": "2024-09-25", "org": "Meta", "open": true}, {"name": "Phi 4 Mini Reasoning", "params": 3800000000, "year": 2025, "date": "2025-04-30", "org": "Microsoft", "open": true}, {"name": "Phi-3.5-mini-instruct", "params": 3800000000, "year": 2024, "date": "2024-08-23", "org": "Microsoft", "open": true}, {"name": "Phi 4 Mini", "params": 3840000000, "year": 2025, "date": "2025-02-01", "org": "Microsoft", "open": true}, {"name": "Gemma 3 4B", "params": 4000000000, "year": 2025, "date": "2025-03-12", "org": "Google", "open": true}, {"name": "Qwen3 VL 4B Instruct", "params": 4000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3 VL 4B Thinking", "params": 4000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3.5-4B", "params": 4000000000, "year": 2026, "date": "2026-03-02", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Phi-3.5-vision-instruct", "params": 4200000000, "year": 2024, "date": "2024-08-23", "org": "Microsoft", "open": true}, {"name": "MedGemma 4B IT", "params": 4300000000, "year": 2025, "date": "2025-05-20", "org": "Google", "open": true}, {"name": "Gemma 4 E2B", "params": 5100000000, "year": 2026, "date": "2026-04-02", "org": "Google", "open": true}, {"name": "Phi-4-multimodal-instruct", "params": 5600000000, "year": 2025, "date": "2025-02-01", "org": "Microsoft", "open": true}, {"name": "IBM Granite 4.0 Tiny Preview", "params": 7000000000, "year": 2025, "date": "2025-05-02", "org": "IBM", "open": true}, {"name": "Qwen2.5-Coder 7B Instruct", "params": 7000000000, "year": 2024, "date": "2024-09-19", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen2.5-Omni-7B", "params": 7000000000, "year": 2025, "date": "2025-03-27", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen2.5 7B Instruct", "params": 7610000000, "year": 2024, "date": "2024-09-19", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "DeepSeek R1 Distill Qwen 7B", "params": 7620000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "Qwen2 7B Instruct", "params": 7620000000, "year": 2024, "date": "2024-07-23", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Gemini 1.5 Flash 8B", "params": 8000000000, "year": 2024, "date": "2024-03-15", "org": "Google", "open": false}, {"name": "Gemma 3n E2B", "params": 8000000000, "year": 2025, "date": "2025-06-26", "org": "Google", "open": false}, {"name": "Gemma 3n E2B Instructed", "params": 8000000000, "year": 2025, "date": "2025-06-26", "org": "Google", "open": false}, {"name": "Gemma 3n E4B", "params": 8000000000, "year": 2025, "date": "2025-06-26", "org": "Google", "open": false}, {"name": "Gemma 3n E4B Instructed", "params": 8000000000, "year": 2025, "date": "2025-06-26", "org": "Google", "open": false}, {"name": "Gemma 4 E4B", "params": 8000000000, "year": 2026, "date": "2026-04-02", "org": "Google", "open": true}, {"name": "Granite 3.3 8B Instruct", "params": 8000000000, "year": 2025, "date": "2025-04-16", "org": "IBM", "open": true}, {"name": "Llama 3.1 8B Instruct", "params": 8000000000, "year": 2024, "date": "2024-07-23", "org": "Meta", "open": true}, {"name": "Llama 3.1 Nemotron Nano 8B V1", "params": 8000000000, "year": 2025, "date": "2025-03-18", "org": "NVIDIA", "open": true}, {"name": "Ministral 3 (8B Base 2512)", "params": 8000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Ministral 3 (8B Instruct 2512)", "params": 8000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Ministral 3 (8B Reasoning 2512)", "params": 8000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Ministral 8B Instruct", "params": 8019808256, "year": 2024, "date": "2024-10-16", "org": "Mistral AI", "open": true}, {"name": "DeepSeek R1 Distill Llama 8B", "params": 8030000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "Granite 3.3 8B Base", "params": 8170000000, "year": 2025, "date": "2025-04-16", "org": "IBM", "open": true}, {"name": "Qwen2.5 VL 7B Instruct", "params": 8290000000, "year": 2025, "date": "2025-01-26", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Nemotron Nano 9B v2", "params": 8900000000, "year": 2025, "date": "2025-08-18", "org": "NVIDIA", "open": true}, {"name": "Qwen3 VL 8B Instruct", "params": 9000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3 VL 8B Thinking", "params": 9000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3.5-9B", "params": 9000000000, "year": 2026, "date": "2026-03-02", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Gemma 2 9B", "params": 9240000000, "year": 2024, "date": "2024-06-27", "org": "Google", "open": true}, {"name": "MiniCPM-SALA", "params": 9477203968, "year": 2026, "date": "2026-02-11", "org": "OpenBMB", "open": true}, {"name": "Step3-VL-10B", "params": 10000000000, "year": 2026, "date": "2026-01-15", "org": "StepFun", "open": true}, {"name": "Llama 3.2 11B Instruct", "params": 10600000000, "year": 2024, "date": "2024-09-25", "org": "Meta", "open": true}, {"name": "Gemma 3 12B", "params": 12000000000, "year": 2025, "date": "2025-03-12", "org": "Google", "open": true}, {"name": "Mistral NeMo Instruct", "params": 12000000000, "year": 2024, "date": "2024-07-18", "org": "Mistral AI", "open": true}, {"name": "Pixtral-12B", "params": 12400000000, "year": 2024, "date": "2024-09-17", "org": "Mistral AI", "open": true}, {"name": "MiniStral 3 (14B Instruct 2512)", "params": 14000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Ministral 3 (14B Base 2512)", "params": 14000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Ministral 3 (14B Reasoning 2512)", "params": 14000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Phi 4 Reasoning", "params": 14000000000, "year": 2025, "date": "2025-04-30", "org": "Microsoft", "open": true}, {"name": "Phi 4 Reasoning Plus", "params": 14000000000, "year": 2025, "date": "2025-04-30", "org": "Microsoft", "open": true}, {"name": "Phi 4", "params": 14700000000, "year": 2024, "date": "2024-12-12", "org": "Microsoft", "open": true}, {"name": "Qwen2.5 14B Instruct", "params": 14700000000, "year": 2024, "date": "2024-09-19", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "DeepSeek R1 Distill Qwen 14B", "params": 14800000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "DeepSeek VL2 Small", "params": 16000000000, "year": 2024, "date": "2024-12-13", "org": "DeepSeek", "open": true}, {"name": "GPT OSS 20B", "params": 20900000000, "year": 2025, "date": "2025-08-05", "org": "OpenAI", "open": true}, {"name": "GPT OSS 20B High", "params": 20900000000, "year": 2025, "date": "2025-08-05", "org": "OpenAI", "open": true}, {"name": "ERNIE 4.5", "params": 21000000000, "year": 2025, "date": "2025-06-25", "org": "Baidu", "open": false}, {"name": "Mistral Small", "params": 22000000000, "year": 2024, "date": "2024-09-17", "org": "Mistral AI", "open": true}, {"name": "Codestral-22B", "params": 22200000000, "year": 2024, "date": "2024-05-29", "org": "Mistral AI", "open": true}, {"name": "Mistral Small 3 24B Base", "params": 23600000000, "year": 2025, "date": "2025-01-30", "org": "Mistral AI", "open": true}, {"name": "Mistral Small 3.2 24B Instruct", "params": 23600000000, "year": 2025, "date": "2025-06-20", "org": "Mistral AI", "open": true}, {"name": "Devstral Small 1.1", "params": 24000000000, "year": 2025, "date": "2025-07-11", "org": "Mistral AI", "open": true}, {"name": "Magistral Medium", "params": 24000000000, "year": 2025, "date": "2025-06-10", "org": "Mistral AI", "open": true}, {"name": "Magistral Small 2506", "params": 24000000000, "year": 2025, "date": "2025-06-10", "org": "Mistral AI", "open": true}, {"name": "Mistral Small 3 24B Instruct", "params": 24000000000, "year": 2025, "date": "2025-01-30", "org": "Mistral AI", "open": true}, {"name": "Mistral Small 3.1 24B Base", "params": 24000000000, "year": 2025, "date": "2025-03-17", "org": "Mistral AI", "open": true}, {"name": "Mistral Small 3.1 24B Instruct", "params": 24000000000, "year": 2025, "date": "2025-03-17", "org": "Mistral AI", "open": true}, {"name": "Gemma 4 26B-A4B", "params": 25200000000, "year": 2026, "date": "2026-04-02", "org": "Google", "open": true}, {"name": "DeepSeek VL2", "params": 27000000000, "year": 2024, "date": "2024-12-13", "org": "DeepSeek", "open": true}, {"name": "Gemma 3 27B", "params": 27000000000, "year": 2025, "date": "2025-03-12", "org": "Google", "open": true}, {"name": "Qwen3.5-27B", "params": 27000000000, "year": 2026, "date": "2026-02-24", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Gemma 2 27B", "params": 27200000000, "year": 2024, "date": "2024-06-27", "org": "Google", "open": true}, {"name": "Qwen3.6-27B", "params": 27781427952, "year": 2026, "date": "2026-04-21", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "GLM-4.7-Flash", "params": 30000000000, "year": 2026, "date": "2026-01-19", "org": "Zhipu AI", "open": true}, {"name": "Sarvam-30B", "params": 30000000000, "year": 2026, "date": "2026-03-06", "org": "Sarvam AI", "open": true}, {"name": "Qwen3 30B A3B", "params": 30500000000, "year": 2025, "date": "2025-04-29", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Gemma 4 31B", "params": 30700000000, "year": 2026, "date": "2026-04-02", "org": "Google", "open": true}, {"name": "Qwen3 VL 30B A3B Instruct", "params": 31000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3 VL 30B A3B Thinking", "params": 31000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Nemotron 3 Nano (30B A3B)", "params": 32000000000, "year": 2025, "date": "2025-12-15", "org": "NVIDIA", "open": true}, {"name": "Qwen2.5-Coder 32B Instruct", "params": 32000000000, "year": 2024, "date": "2024-09-19", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "QwQ-32B", "params": 32500000000, "year": 2025, "date": "2025-03-05", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "QwQ-32B-Preview", "params": 32500000000, "year": 2024, "date": "2024-11-28", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen2.5 32B Instruct", "params": 32500000000, "year": 2024, "date": "2024-09-19", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "DeepSeek R1 Distill Qwen 32B", "params": 32800000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "Qwen3 32B", "params": 32800000000, "year": 2025, "date": "2025-04-29", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3 VL 32B Instruct", "params": 33000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3 VL 32B Thinking", "params": 33000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen2.5 VL 32B Instruct", "params": 33500000000, "year": 2025, "date": "2025-02-28", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3.5-35B-A3B", "params": 35000000000, "year": 2026, "date": "2026-02-24", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3.6-35B-A3B", "params": 35000000000, "year": 2026, "date": "2026-04-16", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Llama-3.3 Nemotron Super 49B v1", "params": 49900000000, "year": 2025, "date": "2025-03-18", "org": "NVIDIA", "open": true}, {"name": "Jamba 1.5 Mini", "params": 52000000000, "year": 2024, "date": "2024-08-22", "org": "AI21 Labs", "open": true}, {"name": "Phi-3.5-MoE-instruct", "params": 60000000000, "year": 2024, "date": "2024-08-23", "org": "Microsoft", "open": true}, {"name": "LongCat-Flash-Lite", "params": 68500000000, "year": 2026, "date": "2026-02-05", "org": "Meituan", "open": true}, {"name": "Hermes 3 70B", "params": 70000000000, "year": 2024, "date": "2024-08-15", "org": "Nous Research", "open": true}, {"name": "Llama 3.1 70B Instruct", "params": 70000000000, "year": 2024, "date": "2024-07-23", "org": "Meta", "open": true}, {"name": "Llama 3.1 Nemotron 70B Instruct", "params": 70000000000, "year": 2024, "date": "2024-10-01", "org": "NVIDIA", "open": true}, {"name": "Llama 3.3 70B Instruct", "params": 70000000000, "year": 2024, "date": "2024-12-06", "org": "Meta", "open": true}, {"name": "DeepSeek R1 Distill Llama 70B", "params": 70600000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "Qwen2 72B Instruct", "params": 72000000000, "year": 2024, "date": "2024-07-23", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen2.5 VL 72B Instruct", "params": 72000000000, "year": 2025, "date": "2025-01-26", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen2.5 72B Instruct", "params": 72700000000, "year": 2024, "date": "2024-09-19", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "QvQ-72B-Preview", "params": 73400000000, "year": 2024, "date": "2024-12-25", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen2-VL-72B-Instruct", "params": 73400000000, "year": 2024, "date": "2024-08-29", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3-Next-80B-A3B-Base", "params": 80000000000, "year": 2025, "date": "2025-09-10", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3-Next-80B-A3B-Instruct", "params": 80000000000, "year": 2025, "date": "2025-09-10", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3-Next-80B-A3B-Thinking", "params": 80000000000, "year": 2025, "date": "2025-09-10", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Llama 3.2 90B Instruct", "params": 90000000000, "year": 2024, "date": "2024-09-25", "org": "Meta", "open": true}, {"name": "Command R+", "params": 104000000000, "year": 2024, "date": "2024-08-30", "org": "Cohere", "open": true}, {"name": "Sarvam-105B", "params": 105000000000, "year": 2026, "date": "2026-03-06", "org": "Sarvam AI", "open": true}, {"name": "GLM-4.5-Air", "params": 106000000000, "year": 2025, "date": "2025-07-28", "org": "Zhipu AI", "open": true}, {"name": "GLM-4.5V", "params": 108000000000, "year": 2025, "date": "2025-08-11", "org": "Zhipu AI", "open": true}, {"name": "Llama 4 Scout", "params": 109000000000, "year": 2025, "date": "2025-04-05", "org": "Meta", "open": true}, {"name": "GPT OSS 120B", "params": 116800000000, "year": 2025, "date": "2025-08-05", "org": "OpenAI", "open": true}, {"name": "GPT OSS 120B High", "params": 116800000000, "year": 2025, "date": "2025-08-05", "org": "OpenAI", "open": true}, {"name": "Mistral Small 4", "params": 119000000000, "year": 2026, "date": "2026-03-16", "org": "Mistral AI", "open": true}, {"name": "Nemotron 3 Super (120B A12B)", "params": 120000000000, "year": 2026, "date": "2026-03-11", "org": "NVIDIA", "open": true}, {"name": "Qwen3.5-122B-A10B", "params": 122000000000, "year": 2026, "date": "2026-02-24", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Mistral Large 2", "params": 123000000000, "year": 2024, "date": "2024-07-24", "org": "Mistral AI", "open": true}, {"name": "Pixtral Large", "params": 124000000000, "year": 2024, "date": "2024-11-18", "org": "Mistral AI", "open": true}, {"name": "Mistral Medium 3.5", "params": 128000000000, "year": 2026, "date": "2026-04-29", "org": "Mistral AI", "open": true}, {"name": "Step-3.5-Flash", "params": 196000000000, "year": 2026, "date": "2026-02-02", "org": "StepFun", "open": true}, {"name": "MiniMax M2", "params": 230000000000, "year": 2025, "date": "2025-10-27", "org": "MiniMax", "open": true}, {"name": "MiniMax M2.1", "params": 230000000000, "year": 2025, "date": "2025-12-23", "org": "MiniMax", "open": true}, {"name": "MiniMax M2.5", "params": 230000000000, "year": 2026, "date": "2026-02-12", "org": "MiniMax", "open": true}, {"name": "Qwen3 235B A22B", "params": 235000000000, "year": 2025, "date": "2025-04-29", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3-235B-A22B-Instruct-2507", "params": 235000000000, "year": 2025, "date": "2025-07-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3-235B-A22B-Thinking-2507", "params": 235000000000, "year": 2025, "date": "2025-07-25", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "DeepSeek-V2.5", "params": 236000000000, "year": 2024, "date": "2024-05-08", "org": "DeepSeek", "open": true}, {"name": "K-EXAONE-236B-A23B", "params": 236000000000, "year": 2025, "date": "2025-12-31", "org": "LG AI Research", "open": false}, {"name": "Qwen3 VL 235B A22B Instruct", "params": 236000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3 VL 235B A22B Thinking", "params": 236000000000, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Llama 3.1 Nemotron Ultra 253B v1", "params": 253000000000, "year": 2025, "date": "2025-04-07", "org": "NVIDIA", "open": true}, {"name": "DeepSeek-V4-Flash-Max", "params": 284000000000, "year": 2026, "date": "2026-04-23", "org": "DeepSeek", "open": true}, {"name": "MiMo-V2-Flash", "params": 309000000000, "year": 2025, "date": "2025-12-16", "org": "Xiaomi", "open": true}, {"name": "GLM-4.5", "params": 355000000000, "year": 2025, "date": "2025-07-28", "org": "Zhipu AI", "open": true}, {"name": "GLM-4.6", "params": 357000000000, "year": 2025, "date": "2025-09-30", "org": "Zhipu AI", "open": true}, {"name": "GLM-4.7", "params": 358000000000, "year": 2025, "date": "2025-12-22", "org": "Zhipu AI", "open": true}, {"name": "Qwen3.5-397B-A17B", "params": 397000000000, "year": 2026, "date": "2026-02-16", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Jamba 1.5 Large", "params": 398000000000, "year": 2024, "date": "2024-08-22", "org": "AI21 Labs", "open": true}, {"name": "Llama 4 Maverick", "params": 400000000000, "year": 2025, "date": "2025-04-05", "org": "Meta", "open": true}, {"name": "Llama 3.1 405B Instruct", "params": 405000000000, "year": 2024, "date": "2024-07-23", "org": "Meta", "open": true}, {"name": "MiniMax M1 40K", "params": 456000000000, "year": 2025, "date": "2025-06-16", "org": "MiniMax", "open": true}, {"name": "MiniMax M1 80K", "params": 456000000000, "year": 2025, "date": "2025-06-16", "org": "MiniMax", "open": true}, {"name": "Qwen3-Coder", "params": 480000000000, "year": 2025, "date": "2025-01-01", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "Qwen3-Coder 480B A35B Instruct", "params": 480000000000, "year": 2025, "date": "2025-01-31", "org": "Alibaba Cloud / Qwen Team", "open": true}, {"name": "LongCat-Flash-Chat", "params": 560000000000, "year": 2025, "date": "2025-08-29", "org": "Meituan", "open": true}, {"name": "LongCat-Flash-Thinking", "params": 560000000000, "year": 2025, "date": "2025-09-22", "org": "Meituan", "open": true}, {"name": "LongCat-Flash-Thinking-2601", "params": 560000000000, "year": 2026, "date": "2026-01-14", "org": "Meituan", "open": true}, {"name": "DeepSeek R1 Zero", "params": 671000000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-R1", "params": 671000000000, "year": 2025, "date": "2025-01-20", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-R1-0528", "params": 671000000000, "year": 2025, "date": "2025-05-28", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-V3", "params": 671000000000, "year": 2024, "date": "2024-12-25", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-V3 0324", "params": 671000000000, "year": 2025, "date": "2025-03-25", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-V3.1", "params": 671000000000, "year": 2025, "date": "2025-01-10", "org": "DeepSeek", "open": true}, {"name": "Mistral Large 3", "params": 675000000000, "year": 2025, "date": "2025-09-01", "org": "Mistral AI", "open": true}, {"name": "Mistral Large 3 (675B Base)", "params": 675000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Mistral Large 3 (675B Instruct 2512 Eagle)", "params": 675000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Mistral Large 3 (675B Instruct 2512 NVFP4)", "params": 675000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "Mistral Large 3 (675B Instruct 2512)", "params": 675000000000, "year": 2025, "date": "2025-12-04", "org": "Mistral AI", "open": true}, {"name": "DeepSeek-V3.2", "params": 685000000000, "year": 2025, "date": "2025-12-01", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-V3.2 (Non-thinking)", "params": 685000000000, "year": 2025, "date": "2025-12-01", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-V3.2 (Thinking)", "params": 685000000000, "year": 2025, "date": "2025-12-01", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-V3.2-Exp", "params": 685000000000, "year": 2025, "date": "2025-09-29", "org": "DeepSeek", "open": true}, {"name": "DeepSeek-V3.2-Speciale", "params": 685000000000, "year": 2025, "date": "2025-12-01", "org": "DeepSeek", "open": true}, {"name": "GLM-5", "params": 744000000000, "year": 2026, "date": "2026-02-11", "org": "Zhipu AI", "open": true}, {"name": "GLM-5.1", "params": 754000000000, "year": 2026, "date": "2026-04-07", "org": "Zhipu AI", "open": true}, {"name": "Kimi K2 0905", "params": 1000000000000, "year": 2025, "date": "2025-09-05", "org": "Moonshot AI", "open": false}, {"name": "Kimi K2 Base", "params": 1000000000000, "year": 2025, "date": "2025-07-11", "org": "Moonshot AI", "open": true}, {"name": "Kimi K2 Instruct", "params": 1000000000000, "year": 2025, "date": "2025-07-11", "org": "Moonshot AI", "open": true}, {"name": "Kimi K2-Instruct-0905", "params": 1000000000000, "year": 2025, "date": "2025-09-05", "org": "Moonshot AI", "open": true}, {"name": "Kimi K2-Thinking-0905", "params": 1000000000000, "year": 2025, "date": "2025-09-05", "org": "Moonshot AI", "open": true}, {"name": "Kimi K2.5", "params": 1000000000000, "year": 2026, "date": "2026-01-27", "org": "Moonshot AI", "open": true}, {"name": "Kimi K2.6", "params": 1000000000000, "year": 2026, "date": "2026-04-20", "org": "Moonshot AI", "open": true}, {"name": "MiMo-V2-Pro", "params": 1000000000000, "year": 2026, "date": "2026-03-18", "org": "Xiaomi", "open": false}, {"name": "Qwen3 Max", "params": 1000000000000, "year": 2025, "date": "2025-12-15", "org": "Alibaba Cloud / Qwen Team", "open": false}, {"name": "DeepSeek-V4-Pro-Max", "params": 1600000000000, "year": 2026, "date": "2026-04-23", "org": "DeepSeek", "open": true}];
+
+// Assemble the working set; live data swaps in once the proxy responds.
+window.MODELS = [window.ONE_PARAM].concat(window.MODELS_SNAPSHOT);
+
+// ─── Filters: by organization (company) and release year. ───
+window.FILTERS = { q: "", org: "", year: "" };
+
+window.matchFilter = function (m) {
+  if (m.name === "one parameter") return true; // always keep the "1" anchor
+  const F = window.FILTERS;
+  if (F.org && m.org !== F.org) return false;
+  if (F.year && String(m.year) !== String(F.year)) return false;
+  if (F.q) {
+    const q = F.q.toLowerCase();
+    if (!((m.name || "").toLowerCase().includes(q) ||
+          (m.org || "").toLowerCase().includes(q))) return false;
+  }
+  return true;
+};
+
+// The filtered set every view renders from (anchor + matching models, size order).
+window.activeModels = function () {
+  return window.MODELS.filter(window.matchFilter);
+};
+
+// English text converts to tokens at roughly 4/3 of its word count.
+window.TOKENS_PER_WORD = 4 / 3;
+
+// Famous books, by published word count. Multiply by ~4/3 and each book's text
+// becomes a token count — a plain number that sits on the SAME line as the
+// model parameter counts. A book lands at the parameter count it equals in
+// tokens, so "this model = the tokens in N War-and-Peaces" reads directly off
+// the scale. Span runs from a single page up to the Library of Congress.
+window.BOOKS = [
+  { emoji: "📄", label: "printed pages",          one: "a printed page",              words: 300 },
+  { emoji: "📰", label: "magazine features",      one: "a magazine feature",          words: 5_000 },
+  { emoji: "📗", label: "copies of Gatsby",       one: "The Great Gatsby",            words: 47_000 },
+  { emoji: "📘", label: "copies of Moby-Dick",    one: "Moby-Dick",                   words: 206_000 },
+  { emoji: "📕", label: "War & Peaces",           one: "War and Peace",               words: 587_000 },
+  { emoji: "📚", label: "Harry Potter sets",      one: "the Harry Potter series",     words: 1_084_000 },
+  { emoji: "📖", label: "Britannica sets",        one: "the Encyclopædia Britannica", words: 44_000_000 },
+  { emoji: "🌐", label: "Wikipedias",             one: "English Wikipedia",           words: 4_700_000_000 },
+  { emoji: "🏛️", label: "national libraries",     one: "a 5-million-book library",     words: 500_000_000_000 },
+  { emoji: "📜", label: "Libraries of Congress",  one: "the Library of Congress",     words: 1_700_000_000_000 },
+];
+
+// Sort by params ascending so all variations render in scale order.
+window.MODELS.sort((a, b) => a.params - b.params);
+
+// THE KEY IDEA: books are not a side note — they ARE points on the same number
+// line as the models. A book of W words converts to ~W·4/3 tokens; that token
+// count is a plain number we drop straight onto the parameter axis. mergedScale()
+// weaves models + books into one list, sorted by size, so every book lands
+// BETWEEN the models it sits between.
+window.bookTokens = function (b) { return Math.round(b.words * window.TOKENS_PER_WORD); };
+
+window.mergedScale = function () {
+  const models = window.activeModels().map((m) => Object.assign({ type: "model" }, m));
+  const books = window.BOOKS.map((b) => {
+    const tokens = window.bookTokens(b);
+    return Object.assign({ type: "media", params: tokens, tokens }, b);
+  });
+  return models.concat(books).sort((a, b) => a.params - b.params);
+};
+
+// Variation 1: "Dot leader"
+// Faithful to the reference: each row has dots filling the space leading up
+// to a right-aligned number. The total row width is uniform; as the number
+// grows wider (one more digit, more commas), it physically eats into the dot
+// run on its left — that's the "carry" mechanic. Dots are real glyphs in a
+// monospaced grid so the digit positions and dot positions stay aligned.
+
+// Which fold-groups are expanded (keyed by the shared param count). Persists
+// across re-renders so toggling a filter doesn't re-collapse everything.
+window.expandedGroups = window.expandedGroups || new Set();
+
+// The fixed-width monospaced [dots + number] field shared by every row.
+function v1Field(params) {
+  const COLS = 42;
+  const numStr = Math.round(params).toLocaleString("en-US");
+  const dotCells = Math.max(0, COLS - numStr.length - 1);
+  let dotStr = "";
+  for (let i = 0; i < dotCells; i++) {
+    dotStr += (i % 2 === (dotCells % 2 === 0 ? 0 : 1)) ? "." : " ";
+  }
+  const field = document.createElement("div");
+  field.className = "v1-field";
+  const dots = document.createElement("span");
+  dots.className = "v1-dots";
+  dots.textContent = dotStr;
+  field.appendChild(dots);
+  const num = document.createElement("span");
+  num.className = "v1-num";
+  num.textContent = " " + numStr;
+  field.appendChild(num);
+  return field;
+}
+
+function v1ModelLabelHTML(m) {
+  if (m.name === "one parameter") return `<span class="v1-label-name muted">${m.name}</span>`;
+  return `<span class="v1-label-name">${escapeHtml(m.name)}</span>` +
+    (m.org ? `<span class="v1-label-org"> · ${escapeHtml(m.org)}</span>` : "") +
+    (m.year ? `<span class="v1-label-year"> ${m.year}</span>` : "");
+}
+
+window.renderV1 = function (root) {
+  root.innerHTML = "";
+  root.className = "view view-v1";
+
+  const items = window.mergedScale();
+  if (!items.some((it) => it.type === "model")) {
+    root.innerHTML = '<p class="empty-msg">No models match the current filters.</p>';
+    return;
+  }
+
+  let i = 0;
+  while (i < items.length) {
+    const it = items[i];
+
+    // Books / media markers — always their own row.
+    if (it.type === "media") {
+      const row = document.createElement("div");
+      row.className = "v1-row is-media";
+      row.appendChild(v1Field(it.params));
+      const label = document.createElement("div");
+      label.className = "v1-label";
+      label.innerHTML =
+        `<span class="v1-media-emoji">${it.emoji}</span>` +
+        `<span class="v1-media-name">${escapeHtml(it.one)}</span>` +
+        `<span class="v1-media-cap">${it.words.toLocaleString("en-US")} words ≈ this many tokens of text</span>`;
+      row.appendChild(label);
+      root.appendChild(row);
+      i++;
+      continue;
+    }
+
+    // Models: gather the run of consecutive models that share this exact size.
+    let j = i;
+    const grp = [];
+    while (j < items.length && items[j].type === "model" && items[j].params === it.params) {
+      grp.push(items[j]);
+      j++;
+    }
+
+    if (grp.length === 1) {
+      const row = document.createElement("div");
+      row.className = "v1-row";
+      row.appendChild(v1Field(it.params));
+      const label = document.createElement("div");
+      label.className = "v1-label";
+      label.innerHTML = v1ModelLabelHTML(grp[0]);
+      row.appendChild(label);
+      root.appendChild(row);
+    } else {
+      // Collapsible group: one header on the scale, N models tucked underneath.
+      const key = it.params;
+      const open = window.expandedGroups.has(key);
+      const head = document.createElement("div");
+      head.className = "v1-row v1-group-head" + (open ? " is-open" : "");
+      head.appendChild(v1Field(it.params));
+      const orgs = [...new Set(grp.map((g) => g.org).filter(Boolean))];
+      const orgTxt = orgs.slice(0, 3).join(", ") + (orgs.length > 3 ? ` +${orgs.length - 3} more` : "");
+      const label = document.createElement("div");
+      label.className = "v1-label";
+      label.innerHTML =
+        `<span class="v1-caret">▸</span>` +
+        `<span class="v1-group-count">${grp.length} models</span>` +
+        `<span class="v1-label-org"> · ${escapeHtml(orgTxt)}</span>`;
+      head.appendChild(label);
+
+      const kids = document.createElement("div");
+      kids.className = "v1-group-kids";
+      kids.style.display = open ? "" : "none";
+      grp.forEach((g) => {
+        const kr = document.createElement("div");
+        kr.className = "v1-kid";
+        kr.innerHTML = v1ModelLabelHTML(g);
+        kids.appendChild(kr);
+      });
+
+      head.addEventListener("click", () => {
+        const nowOpen = kids.style.display === "none";
+        kids.style.display = nowOpen ? "" : "none";
+        head.classList.toggle("is-open", nowOpen);
+        if (nowOpen) window.expandedGroups.add(key);
+        else window.expandedGroups.delete(key);
+      });
+
+      root.appendChild(head);
+      root.appendChild(kids);
+    }
+    i = j;
+  }
+};
+
+// Full count (matrix): integer with thousands separators, "—" below one.
+function fmtCount(n) {
+  if (n < 1) return "—";
+  return Math.round(n).toLocaleString("en-US");
+}
+window.fmtCount = fmtCount;
+
+// Short count (inline chips): 176K, 5.7K, 36, "—".
+function fmtShort(n) {
+  if (n < 1) return "—";
+  if (n < 1000) return String(Math.round(n));
+  if (n < 1e6) { const v = n / 1e3; return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : Math.round(v)) + "K"; }
+  if (n < 1e9) { const v = n / 1e6; return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : Math.round(v)) + "M"; }
+  const v = n / 1e9; return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : Math.round(v)) + "B";
+}
+window.fmtShort = fmtShort;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+window.escapeHtml = escapeHtml;
+
+// Variation 2: "Growth timeline"
+// Plots every model by YEAR (x) against its size (log y), draws a climbing
+// "frontier" line through the record-setters, and overlays famous books as
+// horizontal reference lines — so you can read off exactly when models
+// surpassed Harry Potter, Britannica, all of Wikipedia, the Library of Congress.
+
+window.fmtParamsShort = function (p) {
+  if (p >= 1e12) return (p / 1e12).toFixed(p % 1e12 === 0 ? 0 : (p / 1e12 < 10 ? 2 : 1)) + "T";
+  if (p >= 1e9)  { const b = p / 1e9; return (b < 10 ? b.toFixed(1) : Math.round(b)) + "B"; }
+  if (p >= 1e6)  return Math.round(p / 1e6) + "M";
+  return p.toLocaleString("en-US");
+};
+
+window.renderTimeline = function (root) {
+  root.innerHTML = "";
+  root.className = "view view-timeline";
+
+  const models = window.activeModels().filter((m) => m.year);
+  if (!models.length) { root.innerHTML = '<p class="empty-msg">No models match the current filters.</p>'; return; }
+
+  // Position each model by its precise RELEASE DATE (fractional year), not just the
+  // integer year — otherwise a few years of data stack into vertical strips. The
+  // continuous time axis spreads the dots into a real scatter.
+  const tOf = (m) => {
+    if (m.date) { const p = m.date.split("-"); return +p[0] + ((+p[1] - 1) + (+p[2] - 1) / 31) / 12; }
+    return m.year + 0.5;
+  };
+  models.forEach((m) => (m._t = tOf(m)));
+
+  const ts = models.map((m) => m._t);
+  const Y0 = Math.floor(Math.min(...ts) * 4) / 4 - 0.05;   // pad left a touch
+  const Y1 = Math.max(...ts) + 0.18;                        // breathing room on the right
+  const ps = models.map((m) => m.params);
+  const LOG_MIN = Math.floor(Math.log10(Math.min(...ps)));
+  const LOG_MAX = Math.ceil(Math.log10(Math.max(...ps)));
+
+  const M = { t: 30, r: 42, b: 40, l: 64 };
+  const plotW = 860, plotH = 540;
+  const W = plotW + M.l + M.r, H = plotH + M.t + M.b;
+
+  const xFor = (t) => M.l + ((t - Y0) / (Y1 - Y0)) * plotW;
+  const yFor = (p) => M.t + (1 - (Math.log10(p) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * plotH;
+
+  const plot = document.createElement("div");
+  plot.className = "tl-plot";
+  plot.style.width = W + "px";
+  plot.style.height = H + "px";
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "tl-svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const mk = (tag, attrs) => {
+    const el = document.createElementNS(svgNS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  };
+
+  // y gridlines + ticks (per decade)
+  for (let e = Math.ceil(LOG_MIN); e <= Math.floor(LOG_MAX); e++) {
+    const y = yFor(Math.pow(10, e));
+    svg.appendChild(mk("line", { class: "tl-gridline", x1: M.l, y1: y, x2: M.l + plotW, y2: y }));
+    const tick = document.createElement("div");
+    tick.className = "tl-ytick";
+    tick.style.left = M.l + "px";
+    tick.style.top = y + "px";
+    tick.textContent = window.fmtParamsShort(Math.pow(10, e));
+    plot.appendChild(tick);
+  }
+
+  // x gridlines: a solid line + label at each whole year, faint ticks at quarters.
+  for (let yr = Math.ceil(Y0); yr <= Math.floor(Y1); yr++) {
+    const x = xFor(yr);
+    svg.appendChild(mk("line", { class: "tl-gridline", x1: x, y1: M.t, x2: x, y2: M.t + plotH }));
+    const yl = document.createElement("div");
+    yl.className = "tl-year";
+    yl.style.left = x + "px";
+    yl.style.top = (M.t + plotH + 18) + "px";
+    yl.textContent = yr;
+    plot.appendChild(yl);
+    for (let q = 1; q <= 3; q++) {
+      const xq = xFor(yr + q / 4);
+      if (xq < M.l || xq > M.l + plotW) continue;
+      svg.appendChild(mk("line", { class: "tl-gridline tl-grid-minor", x1: xq, y1: M.t, x2: xq, y2: M.t + plotH }));
+    }
+  }
+
+  // axes
+  svg.appendChild(mk("line", { class: "tl-axis", x1: M.l, y1: M.t, x2: M.l, y2: M.t + plotH }));
+  svg.appendChild(mk("line", { class: "tl-axis", x1: M.l, y1: M.t + plotH, x2: M.l + plotW, y2: M.t + plotH }));
+
+  // book reference lines
+  const refBooks = window.BOOKS.filter((b) => {
+    const l = Math.log10(window.bookTokens(b));
+    return l >= LOG_MIN && l <= LOG_MAX;
+  });
+  refBooks.forEach((b) => {
+    const y = yFor(window.bookTokens(b));
+    svg.appendChild(mk("line", { class: "tl-bookline", x1: M.l, y1: y, x2: M.l + plotW, y2: y }));
+    const lab = document.createElement("div");
+    lab.className = "tl-book";
+    lab.style.left = (M.l + 8) + "px";
+    lab.style.top = (y - 11) + "px";
+    lab.innerHTML = `${b.emoji} ${escapeHtml(b.one)}` +
+      `<span class="tl-book-tok">${window.fmtParamsShort(window.bookTokens(b))} tokens</span>`;
+    plot.appendChild(lab);
+  });
+
+  // frontier = running all-time max as time progresses (by release date)
+  const byDate = models.slice().sort((a, b) => a._t - b._t || a.params - b.params);
+  let max = 0;
+  const records = [];
+  byDate.forEach((m) => { if (m.params > max) { max = m.params; records.push(m); } });
+
+  // frontier polyline (step through record points), extended flat to today's edge
+  const pts = records.map((m) => `${xFor(m._t)},${yFor(m.params)}`);
+  if (records.length) pts.push(`${xFor(Y1)},${yFor(records[records.length - 1].params)}`);
+  svg.appendChild(mk("polyline", { class: "tl-frontier", points: pts.join(" ") }));
+
+  // ── label layout: de-collide vertically, leader lines back to each dot ──
+  const GAP = 18;
+  const TOP = M.t, BOT = M.t + plotH;
+  function decollide(group) {
+    group.sort((a, b) => a.dy - b.dy);
+    group.forEach((g) => (g.ly = g.dy));
+    for (let i = 1; i < group.length; i++)
+      if (group[i].ly < group[i - 1].ly + GAP) group[i].ly = group[i - 1].ly + GAP;
+    if (group.length && group[group.length - 1].ly > BOT) {
+      group[group.length - 1].ly = BOT;
+      for (let i = group.length - 2; i >= 0; i--)
+        if (group[i].ly > group[i + 1].ly - GAP) group[i].ly = group[i + 1].ly - GAP;
+    }
+    if (group.length && group[0].ly < TOP) {
+      group[0].ly = TOP;
+      for (let i = 1; i < group.length; i++)
+        if (group[i].ly < group[i - 1].ly + GAP) group[i].ly = group[i - 1].ly + GAP;
+    }
+  }
+
+  // Every frontier record-setter gets a label. Now that dots are spread along a
+  // continuous time axis, the records no longer pile on one x — de-collide + leader
+  // lines keep them tidy, the way the original plot read.
+  const labs = records.map((m) => ({
+    m, dx: xFor(m._t), dy: yFor(m.params),
+    onRight: (xFor(m._t) - M.l) / plotW > 0.62,
+  }));
+  decollide(labs); // one global pass so no two labels ever share a row, regardless of side
+
+  // leader lines (under the dots)
+  labs.forEach((L) => {
+    const ax = L.onRight ? L.dx - 9 : L.dx + 9;
+    svg.appendChild(mk("line", { class: "tl-leader", x1: L.dx, y1: L.dy, x2: ax, y2: L.ly }));
+  });
+
+  // dots
+  const recordSet = new Set(records);
+  models.forEach((m) => {
+    const isRec = recordSet.has(m);
+    svg.appendChild(mk("circle", {
+      class: isRec ? "tl-dot-record" : "tl-dot",
+      cx: xFor(m._t), cy: yFor(m.params), r: isRec ? 5 : 3,
+    }));
+  });
+
+  plot.appendChild(svg);
+
+  // label elements
+  labs.forEach((L) => {
+    const el = document.createElement("div");
+    el.className = "tl-lab" + (L.onRight ? " left" : "");
+    el.style.top = L.ly + "px";
+    if (L.onRight) {
+      el.style.left = (L.dx - 11) + "px";
+      el.style.transform = "translate(-100%, -50%)";
+    } else {
+      el.style.left = (L.dx + 11) + "px";
+      el.style.transform = "translateY(-50%)";
+    }
+    el.innerHTML = `<span class="nm">${escapeHtml(L.m.name)}</span>` +
+      `<span class="sz">${window.fmtParamsShort(L.m.params)}</span>`;
+    plot.appendChild(el);
+  });
+
+  root.appendChild(plot);
+};
+
+// Variation 3: "Book-count matrix"
+// One column per book. Each cell answers: how many copies of THIS book's text
+// would it take to equal the model's parameter count in tokens (~4/3 per word)?
+// Reading down a column shows the explosion of scale; reading across a row
+// shows what one model's parameter count actually means in books you know.
+
+window.renderV3 = function (root) {
+  const data = window.activeModels();
+  root.innerHTML = "";
+  root.className = "view view-v3";
+
+  const table = document.createElement("div");
+  table.className = "v3-table";
+  const cols = `minmax(190px, 1.4fr) 132px repeat(${window.BOOKS.length}, minmax(66px, 1fr))`;
+  table.style.minWidth = (342 + window.BOOKS.length * 78) + "px";
+
+  // Header row — book identity (emoji · name · word count)
+  const head = document.createElement("div");
+  head.className = "v3-head";
+  head.style.gridTemplateColumns = cols;
+  head.innerHTML =
+    `<div class="v3-h-lab">Model</div>` +
+    `<div class="v3-h-lab r">Parameters</div>` +
+    window.BOOKS.map((b) =>
+      `<div class="v3-h-media">` +
+        `<span class="v3-h-emoji">${b.emoji}</span>` +
+        `<span class="v3-h-name">${escapeHtml(b.one)}</span>` +
+        `<span class="v3-h-cap">${b.words.toLocaleString("en-US")} words</span>` +
+      `</div>`
+    ).join("");
+  table.appendChild(head);
+
+  data.forEach((m) => {
+    const numStr = m.params.toLocaleString("en-US");
+    const row = document.createElement("div");
+    row.className = "v3-row";
+    row.style.gridTemplateColumns = cols;
+
+    let html =
+      `<div class="v3-c-model">` +
+      (m.name === "one parameter"
+        ? `<span class="muted">${m.name}</span>`
+        : `<span class="nm">${escapeHtml(m.name)}</span>` +
+          (m.org ? ` <span class="muted">· ${escapeHtml(m.org)}</span>` : "")) +
+      `</div>` +
+      `<div class="v3-c-params">${numStr}</div>`;
+
+    window.BOOKS.forEach((b) => {
+      const c = m.params / window.bookTokens(b);
+      const z = c < 1 ? " zero" : "";
+      // Compact counts (150M, 9.0M, 255K, 11, —) — full comma numbers were so wide
+      // they overflowed into the neighbouring column. The exact param count stays
+      // full in its own column; the title attribute keeps the precise copy count.
+      html += `<div class="v3-c-count${z}" title="${fmtCount(c)}">${window.fmtShort(c)}</div>`;
+    });
+
+    row.innerHTML = html;
+    table.appendChild(row);
+  });
+
+  root.appendChild(table);
+};
+
+  </script>
+  <script>
+    const captions = {
+      "1": { title: "Dot leader", desc: "Models and famous books share one number line, sorted by size. The accent rows are books — each sits at the token count its text converts to (≈4/3 of its word count). Read the gaps: a model lands between two books, anchoring its parameter count to something you can picture." },
+      "2": { title: "Growth", desc: "When did models reach each size? Every model plotted by year against its parameter count (log scale). The accent line tracks the climbing frontier; the dashed lines mark famous books — read off when models surpassed Harry Potter, Britannica, all of Wikipedia, the Library of Congress." },
+      "3": { title: "Book count", desc: "The other direction: how many copies of each book's text it would take to equal a model's parameter count in tokens. Read across one row — pages · features · Gatsby · Moby-Dick · War and Peace · Harry Potter · Britannica · Wikipedia · libraries." },
+    };
+
+    let currentView = "1";
+
+    function render(n) {
+      currentView = n;
+      const root = document.getElementById("root");
+      const fn = { "1": window.renderV1, "2": window.renderTimeline, "3": window.renderV3 }[n] || window.renderV1;
+      fn(root);
+      const c = captions[n];
+      document.getElementById("cap-title").innerHTML = `<span class="label-num">0${n}</span>${c.title}`;
+      document.getElementById("cap-desc").textContent = c.desc;
+      document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.v === n));
+      updateCount();
+    }
+
+    // ─── Filter controls ───
+    function modelsOnly() { return window.MODELS.filter((m) => m.name !== "one parameter"); }
+
+    function populateFilters() {
+      const all = modelsOnly();
+      const orgSel = document.getElementById("f-org");
+      const yearSel = document.getElementById("f-year");
+      const orgs = [...new Set(all.map((m) => m.org).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const years = [...new Set(all.map((m) => m.year).filter(Boolean))].sort((a, b) => b - a);
+      orgSel.innerHTML = `<option value="">All companies</option>` +
+        orgs.map((o) => `<option value="${o.replace(/"/g, "&quot;")}">${o}</option>`).join("");
+      yearSel.innerHTML = `<option value="">All years</option>` +
+        years.map((y) => `<option value="${y}">${y}</option>`).join("");
+      orgSel.value = window.FILTERS.org;
+      yearSel.value = window.FILTERS.year;
+    }
+
+    function updateCount() {
+      const shown = window.activeModels().filter((m) => m.name !== "one parameter").length;
+      const total = modelsOnly().length;
+      const el = document.getElementById("f-count");
+      if (el) el.textContent = shown === total ? `${total} models` : `${shown} of ${total} models`;
+    }
+
+    document.getElementById("f-q").addEventListener("input", (e) => {
+      window.FILTERS.q = e.target.value.trim();
+      render(currentView);
+    });
+    document.getElementById("f-org").addEventListener("change", (e) => {
+      window.FILTERS.org = e.target.value;
+      render(currentView);
+    });
+    document.getElementById("f-year").addEventListener("change", (e) => {
+      window.FILTERS.year = e.target.value;
+      render(currentView);
+    });
+    document.getElementById("f-clear").addEventListener("click", () => {
+      window.FILTERS = { q: "", org: "", year: "" };
+      document.getElementById("f-q").value = "";
+      document.getElementById("f-org").value = "";
+      document.getElementById("f-year").value = "";
+      render(currentView);
+    });
+
+    document.getElementById("tabs").addEventListener("click", (e) => {
+      const t = e.target.closest(".tab");
+      if (!t) return;
+      render(t.dataset.v);
+      try { localStorage.setItem("llm-scale-v", t.dataset.v); } catch (_) {}
+    });
+
+    // ─── Data plumbing: assemble MODELS, keep the headline + footnote in sync ───
+    function setModels(list) {
+      window.MODELS = [window.ONE_PARAM].concat(list);
+      window.MODELS.sort((a, b) => a.params - b.params);
+      const max = window.MODELS[window.MODELS.length - 1].params;
+      document.getElementById("headline-max").textContent = Math.round(max).toLocaleString("en-US");
+      populateFilters();
+    }
+
+    function setStatus(mode, count, when) {
+      const el = document.getElementById("datasrc");
+      const txt = document.getElementById("datasrc-text");
+      const fn = document.getElementById("fn-meta");
+      el.classList.remove("is-live", "is-snapshot");
+      if (mode === "live") {
+        el.classList.add("is-live");
+        const t = when ? new Date(when * 1000).toLocaleString() : "just now";
+        txt.textContent = `Live · LLM Stats API · ${count} models · updated ${t}`;
+        fn.textContent = `live · ${count} models · fetched ${t}`;
+      } else {
+        el.classList.add("is-snapshot");
+        txt.textContent = `LLM Stats snapshot · ${count} models`;
+        fn.textContent = `LLM Stats snapshot · ${count} models`;
+      }
+    }
+
+    // Initial paint from the embedded snapshot so the page is never blank.
+    setModels(window.MODELS_SNAPSHOT);
+    const initial = (() => { try { const v = localStorage.getItem("llm-scale-v"); return (v === "1" || v === "2" || v === "3") ? v : "1"; } catch (_) { return "1"; } })();
+    render(initial);
+    setStatus("snapshot", window.MODELS_SNAPSHOT.length);
+
+    // Live data = data/parameters.json, regenerated hourly by the GitHub Action.
+    // param_count lives only on the `stats` catalog, which blocks cross-origin browser
+    // requests — so the Action fetches it SERVER-SIDE (key in a Secret) and writes this
+    // file; the browser just reads it. Falls back to the embedded snapshot if absent.
+    fetch("data/parameters.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+      .then((d) => {
+        if (!d || !Array.isArray(d.models) || !d.models.length) throw new Error("empty");
+        setModels(d.models);
+        render(currentView);
+        setStatus("live", d.models.length, d.fetched_at);
+      })
+      .catch(() => { /* keep snapshot; status already reflects it */ });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Receipts · AI Pricing Archive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Special+Elite&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+/* ========== RECEIPT ARCHIVE · LIGHT / REALISTIC ========== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #e8e1d0;
+  color: #2a2520;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 90% 70% at 30% 20%, rgba(255,250,235,0.55), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 80% 100%, rgba(120,90,50,0.10), transparent 60%),
+    repeating-linear-gradient(92deg, rgba(120,90,50,0.025) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(2deg,  rgba(80,60,30,0.022)   0 1px, transparent 1px 4px),
+    #e8e1d0;
+  pointer-events: none;
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(circle at 23% 47%, rgba(80,60,30,0.04) 0.5px, transparent 1.5px),
+    radial-gradient(circle at 78% 32%, rgba(80,60,30,0.035) 0.5px, transparent 1.5px),
+    radial-gradient(circle at 61% 79%, rgba(80,60,30,0.04) 0.5px, transparent 1.5px);
+  background-size: 220px 220px, 320px 320px, 180px 180px;
+  pointer-events: none;
+  z-index: 1;
+}
+#root { position: relative; z-index: 2; height: 100vh; width: 100vw; }
+
+/* boot */
+.boot-screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.boot-mark {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #c4452f;
+  box-shadow: 0 0 0 6px rgba(196,69,47,0.12);
+  animation: boot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes boot-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 6px rgba(196,69,47,0.12); }
+  50%      { transform: scale(0.85); box-shadow: 0 0 0 14px rgba(196,69,47,0.0); }
+}
+.boot-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px; color: #2a2520; font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.boot-sub {
+  font-size: 10px; letter-spacing: 0.22em; color: #8a7a5a;
+}
+.boot-sub.err { color: #c4452f; }
+
+/* counter */
+.counter { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.counter-strip {
+  flex: 0 0 auto;
+  padding: 18px 36px 10px;
+  display: flex; align-items: center; gap: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.18em; color: #8a7a5a;
+  flex-wrap: wrap;
+}
+.counter-strip b {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic; font-weight: 600; color: #2a2520;
+  font-size: 16px; letter-spacing: 0.02em; margin-left: 6px;
+}
+.counter-strip .cs-sep { color: rgba(80,60,30,0.3); margin: 0 2px; }
+.counter-strip .cs-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #c4452f; font-weight: 700;
+}
+.counter-strip .cs-live::before {
+  content: ''; width: 6px; height: 6px;
+  border-radius: 50%; background: #c4452f;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+/* task dropdown */
+.task-dd { position: relative; display: inline-block; margin-left: 6px; }
+.task-dd-trigger {
+  background: transparent; border: 1px solid rgba(80,60,30,0.25);
+  border-radius: 2px; padding: 4px 10px 4px 12px; cursor: pointer;
+  display: inline-flex; align-items: baseline; gap: 8px;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+.task-dd-trigger:hover { background: rgba(255,250,238,0.6); border-color: rgba(80,60,30,0.45); }
+.task-dd-trigger[aria-expanded="true"] { background: #2a2520; border-color: #2a2520; }
+.task-dd-trigger[aria-expanded="true"] b,
+.task-dd-trigger[aria-expanded="true"] .task-dd-caret { color: #fbf6e8; }
+.task-dd-trigger b {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic; font-weight: 600; color: #2a2520;
+  font-size: 16px; letter-spacing: 0.02em;
+}
+.task-dd-caret { font-size: 9px; color: #8a7a5a; }
+.task-dd-menu {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  min-width: 360px; background: #fdfaef;
+  border: 1px solid rgba(80,60,30,0.18);
+  box-shadow: 0 2px 4px rgba(80,60,30,0.10), 0 12px 32px rgba(80,60,30,0.22);
+  z-index: 100; padding: 4px;
+  display: flex; flex-direction: column;
+  border-radius: 2px;
+}
+.task-dd-item {
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto;
+  background: transparent; border: none; text-align: left;
+  padding: 10px 12px; cursor: pointer; font-family: inherit;
+  transition: background 0.1s; gap: 2px 12px; border-radius: 1px;
+}
+.task-dd-item:hover { background: rgba(80,60,30,0.06); }
+.task-dd-item.active { background: rgba(196,69,47,0.10); }
+.task-dd-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic; font-weight: 600; font-size: 16px;
+  letter-spacing: 0.02em; color: #2a2520; line-height: 1.1;
+  grid-column: 1; grid-row: 1;
+}
+.task-dd-toks {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+  color: #c4452f; grid-column: 2; grid-row: 1; align-self: center;
+}
+.task-dd-descr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 0.06em; color: #8a7a5a;
+  grid-column: 1 / -1; grid-row: 2; text-transform: none;
+}
+
+/* wall */
+.wall {
+  flex: 1 1 auto;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 24px 36px 60px;
+}
+.wall-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 32px 24px; position: relative;
+}
+
+/* receipt */
+.receipt {
+  position: relative;
+  background: #fdfaef; color: #2a2520;
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 16px 18px 18px;
+  width: 100%; min-height: 240px; cursor: pointer;
+  transition: transform 0.2s cubic-bezier(.2,.7,.3,1.3), box-shadow 0.2s, filter 0.2s;
+  box-shadow:
+    0 1px 0 rgba(80,60,30,0.06),
+    0 2px 3px rgba(80,60,30,0.10),
+    0 8px 16px rgba(80,60,30,0.12),
+    0 16px 30px rgba(80,60,30,0.08);
+  -webkit-mask:
+    radial-gradient(circle at 6px 0, transparent 5px, #000 6px) 0 0/12px 7px repeat-x,
+    linear-gradient(#000 0 0) 0 7px/100% calc(100% - 14px) no-repeat,
+    radial-gradient(circle at 6px 7px, transparent 5px, #000 6px) 0 100%/12px 7px repeat-x;
+          mask:
+    radial-gradient(circle at 6px 0, transparent 5px, #000 6px) 0 0/12px 7px repeat-x,
+    linear-gradient(#000 0 0) 0 7px/100% calc(100% - 14px) no-repeat,
+    radial-gradient(circle at 6px 7px, transparent 5px, #000 6px) 0 100%/12px 7px repeat-x;
+}
+.receipt::before {
+  content: ''; position: absolute; inset: 7px 0;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(80,60,30,0.018) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(91deg, rgba(80,60,30,0.012) 0 1px, transparent 1px 6px);
+  pointer-events: none; z-index: 1;
+}
+.receipt::after {
+  content: ''; position: absolute; inset: 7px 0;
+  background:
+    radial-gradient(ellipse 60% 30% at 80% 15%, rgba(170,130,70,0.07), transparent 60%),
+    radial-gradient(ellipse 40% 25% at 15% 88%, rgba(120,80,30,0.05), transparent 60%);
+  pointer-events: none; z-index: 1;
+}
+.receipt > * { position: relative; z-index: 2; }
+.receipt:hover {
+  transform: translateY(-6px) scale(1.03);
+  box-shadow:
+    0 1px 0 rgba(80,60,30,0.06),
+    0 4px 6px rgba(80,60,30,0.12),
+    0 16px 24px rgba(80,60,30,0.18),
+    0 28px 44px rgba(80,60,30,0.10);
+  z-index: 10;
+}
+
+.r-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 9px; letter-spacing: 0.18em; color: #8a7a5a;
+  padding-bottom: 8px; border-bottom: 1px dashed rgba(80,60,30,0.35);
+}
+.r-company {
+  font-size: 13px; letter-spacing: 0.16em; font-weight: 700;
+  color: #2a2520; margin: 12px 0 4px;
+  display: flex; align-items: center; gap: 8px;
+}
+.station-glyph {
+  display: inline-flex; width: 20px; height: 20px;
+  color: #2a2520; flex-shrink: 0; opacity: 0.92;
+}
+.station-glyph svg { width: 100%; height: 100%; display: block; }
+.r-model {
+  font-size: 20px; line-height: 1.1; font-weight: 600;
+  letter-spacing: 0.01em; color: #2a2520; margin-bottom: 14px;
+  word-break: break-word;
+}
+.r-block { margin-top: 10px; }
+.r-block .lbl { font-size: 9px; letter-spacing: 0.2em; color: #8a7a5a; }
+.r-block .price {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600; font-size: 22px; line-height: 1.1;
+  letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+  color: #2a2520; margin-top: 2px;
+}
+.r-block .price .unit {
+  font-size: 10px; font-weight: 400; color: #8a7a5a;
+  letter-spacing: 0.12em; margin-left: 4px;
+}
+.r-meta-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin-top: 8px; font-size: 9px; letter-spacing: 0.12em;
+  color: #8a7a5a;
+}
+.r-meta-row b { color: #2a2520; font-weight: 700; font-variant-numeric: tabular-nums; }
+.r-rule { border-top: 1px dashed rgba(80,60,30,0.35); margin: 14px 0 0; height: 0; }
+.r-total {
+  margin: 12px -18px -18px;
+  background: #2a2520; color: #fbf6e8;
+  padding: 14px 18px 16px; position: relative;
+}
+.r-total .lbl { font-size: 9px; letter-spacing: 0.22em; opacity: 0.7; margin-bottom: 4px; }
+.r-total .lbl .task-name {
+  display: block; font-size: 8px; letter-spacing: 0.16em;
+  opacity: 0.5; margin-top: 2px; text-transform: uppercase;
+}
+.r-total .total-row { display: flex; align-items: baseline; justify-content: space-between; }
+.r-total .charge {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; font-size: 26px; letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.r-total .barcode-mini { display: flex; gap: 1px; height: 18px; }
+.r-total .barcode-mini i {
+  display: block; background: #fbf6e8;
+  opacity: 0.85; width: 1px; height: 100%;
+}
+
+/* station type variants */
+.r-ath .r-company { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 15px; letter-spacing: 0.08em; }
+.r-ath .r-model   { font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 500; font-size: 24px; }
+.r-oai .r-company { font-family: 'Helvetica', 'Inter', sans-serif; font-weight: 800; letter-spacing: 0.18em; }
+.r-oai .r-model   { font-family: 'Helvetica', 'Inter', sans-serif; font-weight: 600; letter-spacing: 0; }
+.r-ggl .r-company { font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: 0.22em; }
+.r-ggl .r-model   { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 17px; letter-spacing: 0.04em; }
+.r-mta .r-company { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
+.r-mta .r-model   { font-family: 'JetBrains Mono', monospace; font-size: 16px; letter-spacing: 0.04em; }
+.r-mst .r-company { font-family: 'Courier New', monospace; font-style: italic; font-weight: 700; }
+.r-mst .r-model   { font-family: 'Courier New', monospace; font-style: italic; font-weight: 700; }
+.r-dsk .r-company { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 11px; letter-spacing: 0.3em; }
+.r-dsk .r-model   { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 17px; letter-spacing: 0.04em; }
+.r-chr .r-company { font-family: 'Helvetica', sans-serif; font-weight: 900; font-size: 14px; letter-spacing: 0.06em; }
+.r-chr .r-model   { font-family: 'Helvetica', sans-serif; font-weight: 700; letter-spacing: 0; }
+.r-xai .r-company { font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: 0.32em; font-size: 11px; }
+.r-xai .r-model   { font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: 0.05em; font-size: 17px; }
+.r-qwn .r-company { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 12px; letter-spacing: 0.26em; }
+.r-qwn .r-model   { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 17px; letter-spacing: 0.04em; }
+.r-gen .r-company { font-family: 'Special Elite', monospace; font-weight: 400; letter-spacing: 0.14em; }
+.r-gen .r-model   { font-family: 'Special Elite', monospace; font-weight: 400; }
+
+@keyframes receipt-print {
+  0%   { transform: translateY(-30px) scaleY(0.05); opacity: 0; }
+  18%  { opacity: 1; }
+  100% { transform: translateY(0) scaleY(1); opacity: 1; }
+}
+.receipt.printing {
+  animation: receipt-print 0.45s cubic-bezier(.2,.7,.3,1) backwards;
+  transform-origin: top center;
+}
+
+.wall::-webkit-scrollbar { width: 8px; }
+.wall::-webkit-scrollbar-track { background: transparent; }
+.wall::-webkit-scrollbar-thumb { background: rgba(80,60,30,0.18); border-radius: 4px; }
+.wall::-webkit-scrollbar-thumb:hover { background: rgba(80,60,30,0.3); }
+
+@media (max-width: 800px) {
+  .counter-strip { padding: 14px 20px 8px; font-size: 9px; gap: 10px; flex-wrap: wrap; }
+  .wall { padding: 18px 20px 60px; }
+  .wall-grid { gap: 24px 18px; }
+}
+
+/* grouped view */
+.groups { display: flex; flex-direction: column; gap: 28px; position: relative; }
+.groups-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.18em; color: #8a7a5a;
+  padding-bottom: 4px; margin-bottom: -8px;
+}
+.groups-toolbar-actions { display: flex; align-items: center; gap: 6px; }
+.groups-toolbar button {
+  background: transparent; border: none; font-family: inherit;
+  font-size: 10px; letter-spacing: 0.18em; color: #c4452f;
+  cursor: pointer; padding: 2px 4px; font-weight: 600;
+}
+.groups-toolbar button:hover { text-decoration: underline; }
+
+.group { position: relative; }
+.group-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(280px, 1.4fr) minmax(220px, 1fr) 200px 40px;
+  align-items: center; gap: 24px;
+  padding: 30px 24px 30px 28px;
+  background: #fdfaef; border: none; border-left: 6px solid #2a2520;
+  cursor: pointer; text-align: left;
+  font-family: 'IBM Plex Mono', monospace;
+  box-shadow:
+    0 1px 0 rgba(80,60,30,0.06),
+    0 2px 4px rgba(80,60,30,0.10),
+    0 12px 24px rgba(80,60,30,0.10);
+  transition: transform 0.18s cubic-bezier(.2,.7,.3,1.3), box-shadow 0.18s, border-color 0.18s;
+  position: relative; overflow: hidden;
+}
+.group-head::before {
+  content: ''; position: absolute; inset: 0;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(80,60,30,0.018) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(91deg, rgba(80,60,30,0.012) 0 1px, transparent 1px 6px);
+  pointer-events: none;
+}
+.group-head:hover {
+  transform: translateX(-2px); border-left-color: #c4452f;
+  box-shadow:
+    0 1px 0 rgba(80,60,30,0.06),
+    0 4px 8px rgba(80,60,30,0.15),
+    0 20px 40px rgba(80,60,30,0.16);
+}
+.group.expanded .group-head { border-left-color: #c4452f; background: #2a2520; color: #fbf6e8; }
+.group.expanded .group-head:hover { transform: none; }
+.group.expanded .group-label,
+.group.expanded .group-sublabel,
+.group.expanded .ghm-lbl,
+.group.expanded .ghm-val,
+.group.expanded .group-chevron { color: #fbf6e8; }
+.group.expanded .ghm-lbl { opacity: 0.55; }
+
+.group-head-left { display: flex; align-items: center; gap: 18px; position: relative; }
+.group-glyph {
+  width: 48px; height: 48px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid currentColor; border-radius: 3px;
+  opacity: 0.85; color: #2a2520; flex-shrink: 0;
+}
+.group-glyph .station-glyph { width: 30px; height: 30px; }
+.group.expanded .group-glyph { color: #fbf6e8; }
+.group-head-title { display: flex; flex-direction: column; gap: 4px; }
+.group-label {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500; font-size: 48px; letter-spacing: 0.01em;
+  color: #2a2520; line-height: 0.95; font-feature-settings: "lnum";
+}
+.group-sublabel {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 0.22em; color: #8a7a5a;
+  text-transform: uppercase; font-weight: 500;
+}
+.group-head-meta { display: flex; flex-direction: column; gap: 8px; position: relative; }
+.ghm-row { display: flex; flex-direction: column; gap: 2px; }
+.ghm-lbl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 0.22em; color: #8a7a5a; font-weight: 600;
+}
+.ghm-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px; font-weight: 700; color: #2a2520;
+  letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+}
+.group-stack { position: relative; width: 200px; height: 90px; margin-right: 10px; }
+.gs-paper {
+  position: absolute; background: #fdfaef;
+  border: 1px solid rgba(80,60,30,0.18);
+  box-shadow: 0 1px 0 rgba(80,60,30,0.04), 0 2px 4px rgba(80,60,30,0.06);
+  -webkit-mask:
+    radial-gradient(circle at 5px 0, transparent 4px, #000 5px) 0 0/10px 5px repeat-x,
+    linear-gradient(#000 0 0) 0 5px/100% calc(100% - 10px) no-repeat,
+    radial-gradient(circle at 5px 5px, transparent 4px, #000 5px) 0 100%/10px 5px repeat-x;
+          mask:
+    radial-gradient(circle at 5px 0, transparent 4px, #000 5px) 0 0/10px 5px repeat-x,
+    linear-gradient(#000 0 0) 0 5px/100% calc(100% - 10px) no-repeat,
+    radial-gradient(circle at 5px 5px, transparent 4px, #000 5px) 0 100%/10px 5px repeat-x;
+  transition: transform 0.3s cubic-bezier(.2,.7,.3,1.4);
+}
+.gs-paper.gs-1 { top: 22px; left: 0;   width: 84px; height: 60px; transform: rotate(-8deg); z-index: 1; }
+.gs-paper.gs-2 { top: 16px; left: 30px; width: 84px; height: 64px; transform: rotate(-3deg); z-index: 2; }
+.gs-paper.gs-3 { top: 14px; left: 60px; width: 84px; height: 66px; transform: rotate(2deg);  z-index: 3; }
+.gs-paper.gs-4 { top: 18px; left: 88px; width: 84px; height: 62px; transform: rotate(7deg);  z-index: 4; }
+.gs-paper.gs-5 { top: 24px; left: 110px; width: 84px; height: 58px; transform: rotate(11deg); z-index: 5; }
+.group-head:hover .gs-paper.gs-1 { transform: rotate(-14deg) translate(-4px, -2px); }
+.group-head:hover .gs-paper.gs-2 { transform: rotate(-6deg) translate(-1px, -1px); }
+.group-head:hover .gs-paper.gs-3 { transform: rotate(2deg); }
+.group-head:hover .gs-paper.gs-4 { transform: rotate(10deg) translate(2px, -1px); }
+.group-head:hover .gs-paper.gs-5 { transform: rotate(16deg) translate(6px, -2px); }
+.group.expanded .gs-paper { background: #3a3025; border-color: rgba(255,250,238,0.15); opacity: 0.6; }
+.group-chevron {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px; font-weight: 300; color: #8a7a5a;
+  text-align: center; line-height: 1; transition: transform 0.2s;
+}
+.group:not(.expanded):hover .group-chevron { color: #c4452f; }
+.group-body {
+  padding: 24px 8px 24px;
+  border-left: 6px solid rgba(196,69,47,0.25);
+  margin-top: 2px;
+  background: linear-gradient(180deg, rgba(255,250,238,0.4) 0%, transparent 100%);
+}
+.group-body .wall-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 32px 24px; padding: 8px 16px;
+}
+@media (max-width: 900px) {
+  .group-head { grid-template-columns: 1fr 40px; padding: 22px 18px; gap: 14px; }
+  .group-head-meta { grid-column: 1; }
+  .group-stack { display: none; }
+  .group-label { font-size: 36px; }
+}
+
+/* rules panel */
+.rules-handle {
+  position: fixed; top: 50%; right: 0; transform: translateY(-50%);
+  z-index: 60; width: 36px; height: 130px;
+  background: #fdfaef; border: 1px solid rgba(80,60,30,0.2);
+  border-right: none; border-radius: 3px 0 0 3px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  cursor: pointer;
+  box-shadow: -2px 0 4px rgba(80,60,30,0.06), -8px 4px 16px rgba(80,60,30,0.12);
+  transition: right 0.32s cubic-bezier(.4,.2,.2,1), background 0.15s, border-color 0.15s;
+  font-family: 'JetBrains Mono', monospace; padding: 0;
+}
+.rules-handle:hover { background: #2a2520; border-color: #2a2520; color: #fbf6e8; }
+.rules-handle:hover .rules-handle-text,
+.rules-handle:hover .rules-handle-arrow { color: #fbf6e8; }
+.rules-handle.open { right: 320px; background: #2a2520; border-color: #2a2520; }
+.rules-handle.open .rules-handle-text,
+.rules-handle.open .rules-handle-arrow { color: #fbf6e8; }
+.rules-handle-text {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 11px; letter-spacing: 0.32em; font-weight: 600;
+  color: #2a2520; transition: color 0.15s;
+}
+.rules-handle-arrow { font-size: 18px; color: #8a7a5a; line-height: 0.8; transition: color 0.15s; }
+.rules-scrim { position: fixed; inset: 0; background: transparent; z-index: 55; }
+.rules-panel {
+  position: fixed; top: 0; right: -340px; bottom: 0; width: 320px;
+  background: rgba(245, 238, 222, 0.97);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-left: 1px solid rgba(80,60,30,0.2);
+  box-shadow: -8px 0 32px rgba(80,60,30,0.15);
+  z-index: 58;
+  transition: right 0.32s cubic-bezier(.4,.2,.2,1);
+  display: flex; flex-direction: column;
+  font-family: 'IBM Plex Mono', monospace; overflow-y: auto;
+}
+.rules-panel.open { right: 0; }
+.rules-head {
+  padding: 22px 22px 14px;
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 1px solid rgba(80,60,30,0.15);
+  position: sticky; top: 0;
+  background: rgba(245,238,222,0.97);
+  backdrop-filter: blur(8px); z-index: 2;
+}
+.rules-head h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500; font-size: 28px; color: #2a2520;
+  letter-spacing: 0.01em; line-height: 1;
+}
+.rules-head h3 small {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 0.22em; color: #8a7a5a;
+  margin-top: 4px; font-weight: 400;
+}
+.rules-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: #c4452f; letter-spacing: 0.16em;
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.rules-section { padding: 18px 22px 6px; border-bottom: 1px dashed rgba(80,60,30,0.18); }
+.rules-section:last-of-type { border-bottom: none; }
+.rules-label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 0.24em; color: #8a7a5a;
+  margin-bottom: 10px; font-weight: 600;
+}
+.rules-label-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.rules-label-row .rules-label { margin-bottom: 0; flex: 1; }
+.rules-mini-link {
+  background: transparent; border: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 0.18em; color: #c4452f;
+  cursor: pointer; padding: 0 2px; font-weight: 600;
+}
+.rules-mini-link:hover { text-decoration: underline; }
+.rules-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.rules-pill {
+  background: transparent; border: 1px solid rgba(80,60,30,0.25);
+  color: #5a4a30; font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.1em; padding: 5px 10px;
+  cursor: pointer; transition: all 0.12s; text-transform: uppercase;
+  border-radius: 1px; font-weight: 500;
+}
+.rules-pill:hover { color: #2a2520; border-color: rgba(80,60,30,0.5); background: rgba(255,250,238,0.6); }
+.rules-pill.active { background: #2a2520; color: #fbf6e8; border-color: #2a2520; }
+.rules-footer {
+  margin-top: auto; padding: 18px 22px 22px;
+  border-top: 1px solid rgba(80,60,30,0.15);
+}
+.rules-reset {
+  width: 100%; background: transparent;
+  border: 1px solid rgba(80,60,30,0.3); color: #c4452f;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.2em; padding: 10px;
+  cursor: pointer; transition: all 0.12s;
+  font-weight: 600; border-radius: 1px;
+}
+.rules-reset:hover { background: #c4452f; color: #fdfaef; border-color: #c4452f; }
+.cs-active { color: #c4452f; font-weight: 600; }
+.wall-empty {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 80px 20px; color: #8a7a5a;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.18em; text-align: center;
+}
+.counter.rules-open .wall { padding-right: calc(36px + 320px); }
+@media (max-width: 800px) { .counter.rules-open .wall { padding-right: 320px; } }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root">
+  <div class="boot-screen">
+    <div class="boot-mark"></div>
+    <div class="boot-title">Receipts &middot; AI Pricing Archive</div>
+    <div class="boot-sub" id="bootStatus">Pulling live pricing from LLM&nbsp;Stats&hellip;</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   LIVE DATA LAYER · LLM Stats API
+   docs: https://docs.llm-stats.com/api-reference/introduction
+   ============================================================ */
+window.LLM_STATS_API_KEY  = 'sk_ze_b5rXc5zLCUt8m5kg7DeB2PcBD4k2uz_N23_0hmzmqO0';
+window.LLM_STATS_ENDPOINT = 'https://api.llm-stats.com/stats/v1/models?limit=200&max_input_price=100&sort=input_price';
+window.LLM_STATS_FALLBACK = 'data/live-models.json';
+
+window.FIXED_INPUT_TOKENS = 1_000_000;
+
+/* Map LLM Stats organization.id → design's station visual treatment */
+window.ORG_TO_STATION = {
+  openai:        { station: 'oai', code: 'OAI//SF-94110' },
+  anthropic:     { station: 'ath', code: 'ATH//SF-94107' },
+  google:        { station: 'ggl', code: 'GGL//MTV-94043' },
+  mistral:       { station: 'mst', code: 'MST//PAR-75002' },
+  deepseek:      { station: 'dsk', code: 'DSK//HK-999077' },
+  xai:           { station: 'xai', code: 'XAI//PA-94304' },
+  qwen:          { station: 'qwn', code: 'QWN//HZ-310000' },
+  cohere:        { station: 'chr', code: 'CHR//TOR-M5V' },
+  meta:          { station: 'mta', code: 'MTA//MP-94025' },
+  nvidia:        { station: 'gen', code: 'NVD//SCV' },
+  minimax:       { station: 'gen', code: 'MNX//SH' },
+  moonshotai:    { station: 'gen', code: 'MNS//BJ' },
+  zai_org:       { station: 'gen', code: 'ZAI//BJ' },
+  'zai-org':     { station: 'gen', code: 'ZAI//BJ' },
+  stepfun:       { station: 'gen', code: 'STP//SH' },
+  inceptionlabs: { station: 'gen', code: 'INC//SF' },
+  meituan:       { station: 'gen', code: 'MEI//BJ' },
+  bytedance:     { station: 'gen', code: 'BYD//SH' },
+};
+
+function stationFor(orgId) {
+  return (window.ORG_TO_STATION[orgId] || { station: 'gen', code: (orgId || 'GEN').toUpperCase() + '//—' });
+}
+
+/* Pick the cheapest active provider for input pricing */
+function pickProvider(model) {
+  const provs = (model.providers || []).filter(p =>
+    p && p.status !== 'inactive' &&
+    Number.isFinite(p.input_price_per_m) &&
+    Number.isFinite(p.output_price_per_m)
+  );
+  if (provs.length === 0) return null;
+  provs.sort((a, b) => a.input_price_per_m - b.input_price_per_m);
+  return provs[0];
+}
+
+/* Derive a tier class S/A/B/C/D based on input price */
+function classFor(inPrice) {
+  if (inPrice >= 10) return 'S';
+  if (inPrice >= 3)  return 'A';
+  if (inPrice >= 1)  return 'B';
+  if (inPrice >= 0.2) return 'C';
+  return 'D';
+}
+
+/* Normalize one API model → design's MODELS shape */
+function normalizeModel(m) {
+  const prov = pickProvider(m);
+  if (!prov) return null;
+  const orgId = (m.organization && m.organization.id) || 'gen';
+  const orgName = (m.organization && m.organization.name) || 'UNKNOWN';
+  const st = stationFor(orgId);
+  const releaseDate = m.release_date || '';
+  const year = releaseDate.slice(2, 4) || '—';
+  return {
+    id: m.id,
+    orgId,
+    station: st.station,
+    company: orgName.toUpperCase(),
+    code: st.code,
+    model: (m.name || m.id || '').toUpperCase(),
+    in: Number(prov.input_price_per_m),
+    out: Number(prov.output_price_per_m),
+    year,
+    releaseDate,
+    class: classFor(prov.input_price_per_m),
+    provider: prov.provider_name,
+    context: m.context_window,
+    modalities: m.modalities || [],
+    popular: isPopular(orgId, m.id),
+  };
+}
+
+/* Heuristic: is this a "popular consumer-facing" flagship,
+   as opposed to open-weight / specialized / regional B2B variants? */
+const POPULAR_ORGS = new Set(['openai','anthropic','google','deepseek','mistral','xai','qwen']);
+function isPopular(orgId, rawId) {
+  if (!POPULAR_ORGS.has(orgId)) return false;
+  const id = (rawId || '').toLowerCase();
+  // open-weight families and parameter-counted variants
+  if (/\b\d{1,3}b\b/.test(id))        return false; // e.g. 120b, 30b, 8b, 235b
+  if (/(^|[-_/])(oss|gemma|nemotron)([-_/]|$)/.test(id)) return false;
+  // specialized variants (code/vision)
+  if (/-(codex|code-|vl-)/.test(id))  return false;
+  // legacy
+  if (/^gpt-3\.5/.test(id))           return false;
+  // qwen: only branded consumer products (Max / Plus / Turbo)
+  if (orgId === 'qwen' && !/(^|[-_])(max|plus|turbo)(\b|[-_])/.test(id)) return false;
+  return true;
+}
+
+async function loadLiveModels() {
+  const setStatus = (msg, isErr) => {
+    const el = document.getElementById('bootStatus');
+    if (el) { el.textContent = msg; el.classList.toggle('err', !!isErr); }
+  };
+
+  try {
+    setStatus('Connecting to api.llm-stats.com…');
+    const res = await fetch(window.LLM_STATS_ENDPOINT, {
+      headers: { 'Authorization': 'Bearer ' + window.LLM_STATS_API_KEY },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const raw = (data.models || data || []);
+    const models = raw.map(normalizeModel).filter(Boolean);
+    if (models.length === 0) throw new Error('empty model list');
+    window.MODELS = models;
+    window.MODELS_SOURCE = 'live';
+    window.MODELS_FETCHED_AT = new Date().toISOString();
+    return models;
+  } catch (e) {
+    console.warn('[receipts] live fetch failed, trying local cache:', e);
+    setStatus('Live API unreachable — falling back to cache…');
+    try {
+      const res2 = await fetch(window.LLM_STATS_FALLBACK, { cache: 'no-store' });
+      if (!res2.ok) throw new Error('HTTP ' + res2.status);
+      const data2 = await res2.json();
+      const raw2 = (data2.models || data2 || []);
+      const models2 = raw2.map(normalizeModel).filter(Boolean);
+      window.MODELS = models2;
+      window.MODELS_SOURCE = 'cache';
+      window.MODELS_FETCHED_AT = null;
+      return models2;
+    } catch (e2) {
+      console.error('[receipts] cache also failed:', e2);
+      setStatus('Unable to load model data. Check your network or run ./refresh-data.sh.', true);
+      window.MODELS = [];
+      window.MODELS_SOURCE = 'error';
+      window.MODELS_ERROR = String(e2);
+      return [];
+    }
+  }
+}
+
+window.MODELS_READY = loadLiveModels();
+</script>
+
+<script type="text/babel" data-presets="react">
+/* global React, ReactDOM */
+(function(){
+const { useState, useEffect, useMemo, useRef } = React;
+
+// =========== Helpers ===========
+function fmtPrice(p) {
+  if (p === 0) return '0.00';
+  if (p < 0.1) return p.toFixed(4);
+  if (p < 1)   return p.toFixed(3);
+  return p.toFixed(2);
+}
+function fmtCharge(rate, tokens) {
+  const c = rate * (tokens / 1_000_000);
+  if (c < 0.001)  return '<$0.001';
+  if (c < 0.01)   return '$' + c.toFixed(4);
+  if (c < 1)      return '$' + c.toFixed(3);
+  if (c < 100)    return '$' + c.toFixed(2);
+  return '$' + Math.round(c).toLocaleString();
+}
+function seedFor(id) {
+  let s = 0;
+  for (let i = 0; i < id.length; i++) s = (s * 31 + id.charCodeAt(i)) % 1e9;
+  return s;
+}
+function fmtTokens(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1) + 'K';
+  return String(n);
+}
+
+// =========== Station glyphs ===========
+const GLYPHS = {
+  oai: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3">
+      <polygon points="12,2.5 21,7.5 21,16.5 12,21.5 3,16.5 3,7.5" />
+      <polygon points="12,7 17,9.5 17,14.5 12,17 7,14.5 7,9.5" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+  ath: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3">
+      <rect x="5.5" y="5.5" width="13" height="13" transform="rotate(45 12 12)"/>
+      <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+  ggl: (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="7" cy="7" r="2.4"/><circle cx="17" cy="7" r="2.4"/>
+      <circle cx="7" cy="17" r="2.4"/><circle cx="17" cy="17" r="2.4"/>
+    </svg>
+  ),
+  mta: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+      <path d="M3 12 C 3 7.5, 8.5 7.5, 12 12 C 15.5 16.5, 21 16.5, 21 12 C 21 7.5, 15.5 7.5, 12 12 C 8.5 16.5, 3 16.5, 3 12 Z"/>
+    </svg>
+  ),
+  mst: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <polyline points="4,8 12,4 20,8"/><polyline points="4,14 12,10 20,14"/><polyline points="4,20 12,16 20,20"/>
+    </svg>
+  ),
+  dsk: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M3.5 13 Q 8 9, 12 13 T 20.5 13"/>
+      <path d="M3.5 16 Q 8 12, 12 16 T 20.5 16"/>
+    </svg>
+  ),
+  chr: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <circle cx="12" cy="13" r="2.5" fill="currentColor" stroke="none"/>
+      <path d="M6 13 a 6 6 0 0 1 12 0"/>
+      <path d="M3 13 a 9 9 0 0 1 18 0"/>
+    </svg>
+  ),
+  xai: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/>
+    </svg>
+  ),
+  qwn: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M7 3 L 17 3 L 21 7 L 21 17 L 17 21 L 7 21 L 3 17 L 3 7 Z"/>
+      <rect x="9.5" y="9.5" width="5" height="5" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+  gen: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/>
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+};
+function StationGlyph({ station }) {
+  return <span className="station-glyph" aria-hidden="true">{GLYPHS[station] || GLYPHS.gen}</span>;
+}
+
+// =========== Mini barcode ===========
+function BarcodeMini({ seed }) {
+  const widths = useMemo(() => {
+    const arr = []; let s = seed;
+    for (let i = 0; i < 36; i++) {
+      s = (s * 9301 + 49297) % 233280;
+      const w = 1 + (s % 3);
+      arr.push({ w, gap: 1 + ((s >> 3) % 2) });
+    }
+    return arr;
+  }, [seed]);
+  return (
+    <div className="barcode-mini">
+      {widths.map((b, i) => (
+        <i key={i} style={{ width: b.w + 'px', marginRight: b.gap + 'px' }}></i>
+      ))}
+    </div>
+  );
+}
+
+// =========== Receipt ===========
+function Receipt({ m, idx, isPrinting, taskTokens, taskShort }) {
+  const seed = seedFor(m.id);
+  const rot = ((seed % 7) - 3) * 0.18;
+  return (
+    <div
+      className={`receipt r-${m.station} ${isPrinting ? 'printing' : ''}`}
+      style={{ transform: `rotate(${rot}deg)`, animationDelay: (idx * 16) + 'ms' }}
+      title={`${m.company} ${m.model} · via ${m.provider || '—'}`}
+    >
+      <div className="r-head">
+        <span>{m.code}</span>
+        <span>NO · {String(idx + 1).padStart(3, '0')}</span>
+      </div>
+      <div className="r-company"><StationGlyph station={m.station} />{m.company}</div>
+      <div className="r-model">{m.model}</div>
+
+      <div className="r-rule"></div>
+
+      <div className="r-block">
+        <div className="lbl">INPUT TOKEN PRICE</div>
+        <div className="price">${fmtPrice(m.in)}<span className="unit">/ 1M TOKENS</span></div>
+      </div>
+
+      <div className="r-meta-row">
+        <span>CLASS · <b>{m.class}</b></span>
+        <span>REL · <b>{m.releaseDate ? '20' + m.year : '—'}</b></span>
+      </div>
+
+      <div className="r-total">
+        <div className="lbl">
+          TOTAL CHARGE
+          <span className="task-name">FOR · {taskShort}</span>
+        </div>
+        <div className="total-row">
+          <div className="charge">{fmtCharge(m.in, taskTokens)}</div>
+          <BarcodeMini seed={seed} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========== Tasks ===========
+// Real, recognisable AI workflows people actually run.
+// Token counts grounded in published rate-limits, Cursor/Claude-Code session
+// logs, and Anthropic / OpenAI usage dashboards (~1 token ≈ 4 chars / 0.75 words).
+const TASKS = [
+  {
+    id: 't-qa',
+    name: 'QUICK Q&A',
+    short: 'ONE Q&A',
+    tokens: 800,
+    descr: 'A one-off ChatGPT-style question — no chat history, ~3 short turns',
+  },
+  {
+    id: 't-debug',
+    name: 'DEBUG A SNIPPET',
+    short: 'DEBUG',
+    tokens: 8_000,
+    descr: 'Paste ~200 lines of code + a stack trace, ask "why is this broken?"',
+  },
+  {
+    id: 't-pdf',
+    name: 'READ A PDF',
+    short: 'READ PDF',
+    tokens: 18_000,
+    descr: 'Upload a 12-page arXiv paper, then ask 3 follow-up questions',
+  },
+  {
+    id: 't-cursor',
+    name: 'CURSOR FEATURE',
+    short: 'CURSOR EDIT',
+    tokens: 120_000,
+    descr: 'Cursor agent implements a small feature: edits ~6 files, runs tests once',
+  },
+  {
+    id: 't-cc',
+    name: 'CLAUDE CODE · 1H',
+    short: 'CC SESSION',
+    tokens: 800_000,
+    descr: 'A real 1-hour agentic coding session — file reads, tool loops, a few retries',
+  },
+  {
+    id: 't-dev-month',
+    name: 'ONE DEV · 1 MONTH',
+    short: 'DEV MONTH',
+    tokens: 40_000_000,
+    descr: 'A heavy AI-dev’s 30 days · Cursor + Claude Code daily (~1.3M/day)',
+  },
+  {
+    id: 't-startup',
+    name: 'STARTUP · 1 MONTH',
+    short: 'STARTUP MO',
+    tokens: 500_000_000,
+    descr: 'A growing AI product: 10K MAU × ~50K tokens/user/month',
+  },
+];
+
+function TaskDropdown({ task, setTask }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+  return (
+    <span className="task-dd" ref={ref}>
+      <button className="task-dd-trigger" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <b>{task.name}</b>
+        <span className="task-dd-caret">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div className="task-dd-menu" role="listbox">
+          {TASKS.map(t => (
+            <button
+              key={t.id} role="option" aria-selected={t.id === task.id}
+              className={`task-dd-item ${t.id === task.id ? 'active' : ''}`}
+              onClick={() => { setTask(t); setOpen(false); }}
+            >
+              <span className="task-dd-name">{t.name}</span>
+              <span className="task-dd-toks">≈ {fmtTokens(t.tokens)} TKN</span>
+              <span className="task-dd-descr">{t.descr}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
+// =========== Rules ===========
+const SORTS = [
+  { key: 'cheap',     label: 'CHEAPEST FIRST' },
+  { key: 'expensive', label: 'PRICIEST FIRST' },
+  { key: 'company',   label: 'BY COMPANY' },
+  { key: 'year',      label: 'BY YEAR (NEW → OLD)' },
+];
+const PRICE_BANDS = [
+  { key: 'all',  label: 'ANY',          test: () => true },
+  { key: 'lt1',  label: '< $1',         test: (m) => m.in < 1 },
+  { key: '1-5',  label: '$1 — $5',      test: (m) => m.in >= 1 && m.in <= 5 },
+  { key: 'gt5',  label: '> $5',         test: (m) => m.in > 5 },
+];
+
+function RulesPanel({
+  open, setOpen, sort, setSort,
+  audience, setAudience,
+  companies, toggleCompany, setAllCompanies, allCompanies,
+  priceBand, setPriceBand,
+  year, setYear, allYears,
+  visibleCount, totalCount,
+  onReset,
+}) {
+  return (
+    <>
+      <button
+        className={`rules-handle ${open ? 'open' : ''}`}
+        onClick={() => setOpen(o => !o)}
+        aria-label={open ? 'Close rules' : 'Open rules'}
+      >
+        <span className="rules-handle-text">{open ? 'CLOSE' : 'RULES'}</span>
+        <span className="rules-handle-arrow">{open ? '›' : '‹'}</span>
+      </button>
+      <aside className={`rules-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
+        <header className="rules-head">
+          <h3>Rules<small>FILTER · SORT</small></h3>
+          <span className="rules-count">{visibleCount} / {totalCount}</span>
+        </header>
+
+        <div className="rules-section">
+          <label className="rules-label">AUDIENCE</label>
+          <div className="rules-pills">
+            <button
+              className={`rules-pill ${audience === 'popular' ? 'active' : ''}`}
+              onClick={() => setAudience('popular')}
+              title="Flagship consumer models (Claude, GPT, Gemini, etc.) — hides open-weight & specialized variants"
+            >POPULAR ONLY</button>
+            <button
+              className={`rules-pill ${audience === 'all' ? 'active' : ''}`}
+              onClick={() => setAudience('all')}
+              title="Show every model from the API, including open-weight (GPT-OSS, Gemma, Nemotron) and regional variants"
+            >ALL MODELS</button>
+          </div>
+        </div>
+
+        <div className="rules-section">
+          <label className="rules-label">SORT BY</label>
+          <div className="rules-pills">
+            {SORTS.map(s => (
+              <button key={s.key}
+                className={`rules-pill ${sort === s.key ? 'active' : ''}`}
+                onClick={() => setSort(s.key)}>{s.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rules-section">
+          <div className="rules-label-row">
+            <label className="rules-label">COMPANY</label>
+            <button className="rules-mini-link" onClick={() => setAllCompanies(true)}>ALL</button>
+            <button className="rules-mini-link" onClick={() => setAllCompanies(false)}>NONE</button>
+          </div>
+          <div className="rules-pills">
+            {allCompanies.map(c => (
+              <button key={c}
+                className={`rules-pill ${companies.has(c) ? 'active' : ''}`}
+                onClick={() => toggleCompany(c)}>{c}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rules-section">
+          <label className="rules-label">PRICE PER 1M IN</label>
+          <div className="rules-pills">
+            {PRICE_BANDS.map(b => (
+              <button key={b.key}
+                className={`rules-pill ${priceBand === b.key ? 'active' : ''}`}
+                onClick={() => setPriceBand(b.key)}>{b.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rules-section">
+          <label className="rules-label">RELEASE YEAR</label>
+          <div className="rules-pills">
+            <button
+              className={`rules-pill ${year === 'all' ? 'active' : ''}`}
+              onClick={() => setYear('all')}>ANY</button>
+            {allYears.map(y => (
+              <button key={y}
+                className={`rules-pill ${year === y ? 'active' : ''}`}
+                onClick={() => setYear(y)}>{'20' + y}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rules-footer">
+          <button className="rules-reset" onClick={onReset}>RESET ALL RULES</button>
+        </div>
+      </aside>
+      {open && <div className="rules-scrim" onClick={() => setOpen(false)}></div>}
+    </>
+  );
+}
+
+function GroupBundle({ groupKey, label, sublabel, models, expanded, onToggle, taskTokens, taskShort, glyph }) {
+  const cheapest = models.reduce((a, b) => a.in < b.in ? a : b, models[0]);
+  const priciest = models.reduce((a, b) => a.in > b.in ? a : b, models[0]);
+  return (
+    <div className={`group ${expanded ? 'expanded' : ''}`}>
+      <button className="group-head" onClick={onToggle} aria-expanded={expanded}>
+        <div className="group-head-left">
+          {glyph}
+          <div className="group-head-title">
+            <span className="group-label">{label}</span>
+            {sublabel && <span className="group-sublabel">{sublabel}</span>}
+          </div>
+        </div>
+        <div className="group-head-meta">
+          <div className="ghm-row">
+            <span className="ghm-lbl">RECEIPTS</span>
+            <span className="ghm-val">{String(models.length).padStart(2, '0')}</span>
+          </div>
+          <div className="ghm-row">
+            <span className="ghm-lbl">CHARGE RANGE</span>
+            <span className="ghm-val">{fmtCharge(cheapest.in, taskTokens)} → {fmtCharge(priciest.in, taskTokens)}</span>
+          </div>
+        </div>
+        <div className="group-stack" aria-hidden="true">
+          {models.slice(0, 5).map((_, i) => (
+            <span key={i} className={`gs-paper gs-${i+1}`}></span>
+          ))}
+        </div>
+        <span className="group-chevron">{expanded ? '−' : '+'}</span>
+      </button>
+      {expanded && (
+        <div className="group-body">
+          <div className="wall-grid">
+            {models.map((m, idx) => (
+              <Receipt
+                key={m.id + '-' + groupKey}
+                m={m} idx={idx} isPrinting={true}
+                taskTokens={taskTokens} taskShort={taskShort}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =========== App ===========
+function App() {
+  const [bootState, setBootState] = useState('loading'); // loading | ready | empty
+  const [allModels, setAllModels] = useState([]);
+  const [source, setSource] = useState('live');
+
+  const [task, setTask] = useState(TASKS[1]);
+  const [printKey, setPrintKey] = useState(0);
+
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [sort, setSort] = useState('cheap');
+  const [companies, setCompanies] = useState(() => new Set());
+  const [priceBand, setPriceBand] = useState('all');
+  const [year, setYear] = useState('all');
+  const [audience, setAudience] = useState('popular'); // 'popular' | 'all'
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+
+  // Load models from window.MODELS_READY (set by data layer)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const models = await window.MODELS_READY;
+        if (cancelled) return;
+        setAllModels(models);
+        setSource(window.MODELS_SOURCE || 'live');
+        // initialize company set to all available
+        const allCo = new Set(models.map(m => m.company));
+        setCompanies(allCo);
+        setBootState(models.length === 0 ? 'empty' : 'ready');
+      } catch (e) {
+        if (!cancelled) setBootState('empty');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const allCompanies = useMemo(
+    () => Array.from(new Set(allModels.map(m => m.company))).sort(),
+    [allModels]
+  );
+  const allYears = useMemo(
+    () => Array.from(new Set(allModels.map(m => m.year).filter(y => y && y !== '—'))).sort().reverse(),
+    [allModels]
+  );
+
+  const visible = useMemo(() => {
+    let arr = allModels.filter(m => companies.has(m.company));
+    if (audience === 'popular') arr = arr.filter(m => m.popular);
+    const band = PRICE_BANDS.find(b => b.key === priceBand) || PRICE_BANDS[0];
+    arr = arr.filter(band.test);
+    if (year !== 'all') arr = arr.filter(m => m.year === year);
+    switch (sort) {
+      case 'cheap':     arr.sort((a, b) => a.in - b.in); break;
+      case 'expensive': arr.sort((a, b) => b.in - a.in); break;
+      case 'company':   arr.sort((a, b) => a.company.localeCompare(b.company) || a.in - b.in); break;
+      case 'year':      arr.sort((a, b) => (b.year > a.year ? 1 : b.year < a.year ? -1 : a.in - b.in)); break;
+    }
+    return arr;
+  }, [allModels, companies, priceBand, year, sort, audience]);
+
+  const isGrouped = sort === 'company' || sort === 'year';
+  const groups = useMemo(() => {
+    if (!isGrouped) return null;
+    const byKey = new Map();
+    for (const m of visible) {
+      let key, label, sublabel = '', glyph = null;
+      if (sort === 'company') {
+        key = m.company; label = m.company;
+        sublabel = m.code + ' · ' + m.station.toUpperCase();
+        glyph = <span className="group-glyph"><StationGlyph station={m.station} /></span>;
+      } else {
+        key = m.year; label = '20' + m.year;
+        sublabel = (m.year === '26' ? 'CURRENT GEN' :
+                    m.year === '25' ? 'REASONING GEN' :
+                    m.year === '24' ? 'SCALE GEN' : 'EARLY GEN');
+      }
+      if (!byKey.has(key)) byKey.set(key, { key, label, sublabel, glyph, models: [] });
+      byKey.get(key).models.push(m);
+    }
+    const arr = [...byKey.values()];
+    for (const g of arr) g.models.sort((a, b) => a.in - b.in);
+    if (sort === 'company') arr.sort((a, b) => a.label.localeCompare(b.label));
+    else arr.sort((a, b) => (b.key > a.key ? 1 : b.key < a.key ? -1 : 0));
+    return arr;
+  }, [isGrouped, visible, sort]);
+
+  const prevSortRef = useRef(sort);
+  useEffect(() => {
+    if (prevSortRef.current !== sort) {
+      setExpandedGroups(new Set());
+      prevSortRef.current = sort;
+    }
+  }, [sort]);
+
+  const toggleGroup = (k) => setExpandedGroups(prev => {
+    const next = new Set(prev);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
+  const expandAllGroups = () => groups && setExpandedGroups(new Set(groups.map(g => g.key)));
+  const collapseAllGroups = () => setExpandedGroups(new Set());
+
+  useEffect(() => { setPrintKey(k => k + 1); }, [companies, priceBand, year, task, audience]);
+
+  const handleSetTask = (t) => { if (t.id !== task.id) { setTask(t); setPrintKey(k => k + 1); } };
+
+  const toggleCompany = (key) => setCompanies(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const setAllCompanies = (on) =>
+    setCompanies(on ? new Set(allCompanies) : new Set());
+
+  const reset = () => {
+    setSort('cheap');
+    setCompanies(new Set(allCompanies));
+    setPriceBand('all');
+    setYear('all');
+    setAudience('popular');
+  };
+
+  const activeRuleCount =
+    (sort !== 'cheap' ? 1 : 0) +
+    (companies.size !== allCompanies.length ? 1 : 0) +
+    (priceBand !== 'all' ? 1 : 0) +
+    (year !== 'all' ? 1 : 0) +
+    (audience !== 'popular' ? 1 : 0);
+
+  const sortLabel = SORTS.find(s => s.key === sort)?.label || '';
+
+  if (bootState === 'loading') {
+    return (
+      <div className="boot-screen">
+        <div className="boot-mark"></div>
+        <div className="boot-title">Receipts · AI Pricing Archive</div>
+        <div className="boot-sub">Pulling live pricing from LLM Stats…</div>
+      </div>
+    );
+  }
+  if (bootState === 'empty') {
+    return (
+      <div className="boot-screen">
+        <div className="boot-mark" style={{background:'#8a7a5a'}}></div>
+        <div className="boot-title">No model data available</div>
+        <div className="boot-sub err">Check your network connection or run ./refresh-data.sh</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`counter ${rulesOpen ? 'rules-open' : ''}`}>
+      <div className="counter-strip">
+        <span className="cs-live">{source === 'live' ? 'LIVE · LLM STATS' : 'CACHED'}</span>
+        <span className="cs-sep">·</span>
+        <span className="cs-task">
+          TASK · <TaskDropdown task={task} setTask={handleSetTask} />
+        </span>
+        <span className="cs-sep">·</span>
+        <span>≈ {fmtTokens(task.tokens)} INPUT TOKENS</span>
+        <span className="cs-sep">·</span>
+        <span>{visible.length} / {allModels.length} MODELS</span>
+        <span className="cs-sep">·</span>
+        <span>{sortLabel}</span>
+        {activeRuleCount > 0 && (
+          <>
+            <span className="cs-sep">·</span>
+            <span className="cs-active">{activeRuleCount} RULE{activeRuleCount > 1 ? 'S' : ''} ACTIVE</span>
+          </>
+        )}
+      </div>
+
+      <div className="wall">
+        {visible.length === 0 ? (
+          <div className="wall-empty">
+            NO RECEIPTS MATCH THE CURRENT RULES
+            <button className="rules-pill" onClick={reset} style={{marginTop:18}}>RESET RULES</button>
+          </div>
+        ) : isGrouped ? (
+          <div className="groups">
+            <div className="groups-toolbar">
+              <span>{groups.length} GROUPS · {visible.length} RECEIPTS</span>
+              <div className="groups-toolbar-actions">
+                <button onClick={expandAllGroups}>EXPAND ALL</button>
+                <span className="cs-sep">·</span>
+                <button onClick={collapseAllGroups}>COLLAPSE ALL</button>
+              </div>
+            </div>
+            {groups.map(g => (
+              <GroupBundle key={g.key} groupKey={g.key}
+                label={g.label} sublabel={g.sublabel} glyph={g.glyph}
+                models={g.models}
+                expanded={expandedGroups.has(g.key)}
+                onToggle={() => toggleGroup(g.key)}
+                taskTokens={task.tokens} taskShort={task.short}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="wall-grid" key={printKey}>
+            {visible.map((m, idx) => (
+              <Receipt key={m.id + '-' + printKey}
+                m={m} idx={idx} isPrinting={true}
+                taskTokens={task.tokens} taskShort={task.short}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <RulesPanel
+        open={rulesOpen} setOpen={setRulesOpen}
+        sort={sort} setSort={setSort}
+        audience={audience} setAudience={setAudience}
+        companies={companies} toggleCompany={toggleCompany}
+        setAllCompanies={setAllCompanies} allCompanies={allCompanies}
+        priceBand={priceBand} setPriceBand={setPriceBand}
+        year={year} setYear={setYear} allYears={allYears}
+        visibleCount={visible.length} totalCount={allModels.length}
+        onReset={reset}
+      />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+})();
+</script>
+</body>
+</html>

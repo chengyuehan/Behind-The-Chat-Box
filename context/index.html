@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>How much can a model read at once? — a tour through LLM context windows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3eee3;
+    --ink: #161512;
+    --ink-soft: #5b574f;
+    --muted: #9d978a;
+    --line: #d6cfbe;
+    --accent: #c54a2c;
+    --grid: #cdc6b4;
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); }
+  body { min-height: 100vh; padding: 56px 40px 120px; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 600; }
+
+  /* ───── Header ───── */
+  header.page-head {
+    max-width: 1280px;
+    margin: 0 auto 56px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 32px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+  h1.headline {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(36px, 5vw, 72px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  h1.headline em { font-style: italic; color: var(--accent); }
+  .deck {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 18px 0 0;
+    line-height: 1.4;
+  }
+  .datasrc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 16px 0 0;
+  }
+  .datasrc .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted); flex: none;
+  }
+  .datasrc.is-live .dot { background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+  .datasrc.is-snapshot .dot { background: var(--muted); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Variation tabs */
+  .tabs {
+    display: inline-flex;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+  }
+  .tab {
+    appearance: none;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 11px 14px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .tab:last-child { border-right: none; }
+  .tab:hover { background: rgba(0,0,0,0.04); }
+  .tab.active { background: var(--ink); color: var(--bg); }
+
+  /* ───── Variation block container ───── */
+  .stage {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .variation-caption {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .variation-caption .label-num { color: var(--accent); margin-right: 8px; }
+  .variation-caption .desc { font-family: var(--serif); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink-soft); }
+
+  /* ───── Filter bar ───── */
+  .filterbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 18px;
+    margin: 0 0 22px;
+    flex-wrap: wrap;
+  }
+  .filter-field { display: flex; flex-direction: column; gap: 6px; }
+  .filter-field label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .filter-field input,
+  .filter-field select {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    padding: 8px 10px;
+    min-width: 180px;
+    cursor: pointer;
+  }
+  .filter-field input { cursor: text; }
+  .filter-field input:focus,
+  .filter-field select:focus { outline: none; border-color: var(--ink); }
+  .filter-clear {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 9px 14px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .filter-clear:hover { background: rgba(0,0,0,0.05); }
+  .filter-count {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin-left: auto;
+    padding-bottom: 9px;
+  }
+  .empty-msg { font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--ink-soft); padding: 28px 0; }
+
+  /* Fold groups (V1) */
+  .v1-group-head { cursor: pointer; }
+  .v1-group-head:hover { background: rgba(0,0,0,0.035); border-radius: 2px; }
+  .v1-caret {
+    display: inline-block;
+    color: var(--accent);
+    font-size: 11px;
+    margin-right: 8px;
+    transition: transform 0.15s;
+  }
+  .v1-group-head.is-open .v1-caret { transform: rotate(90deg); }
+  .v1-group-count { font-weight: 600; }
+  .v1-group-kids {
+    margin: -2px 0 4px 9px;
+    padding: 4px 0 4px 22px;
+    border-left: 2px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .v1-kid { font-family: var(--sans); font-size: 12.5px; color: var(--ink); }
+
+  /* ═════════════════════════════════════ V1 — Dot leader ═════════════════════════════════════ */
+  .view-v1 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .v1-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 20px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .v1-field {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: pre;
+    color: var(--ink);
+    letter-spacing: 0;
+  }
+  .v1-dots {
+    color: var(--muted);
+    opacity: 0.85;
+  }
+  .v1-num {
+    font-weight: 500;
+  }
+  .v1-label {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v1-label-name { font-weight: 500; }
+  .v1-label-org { color: var(--muted); }
+  .v1-label-year { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .v1-label-words { color: var(--accent); font-family: var(--mono); font-size: 11px; opacity: 0.85; }
+  /* Media markers — interleaved among the models on the same number line.
+     Horizontal margin/padding cancel so the dot field stays column-aligned. */
+  .v1-row.is-media {
+    background: rgba(197, 74, 44, 0.07);
+    border-radius: 2px;
+    padding: 7px 10px;
+    margin: 2px -10px;
+  }
+  .v1-row.is-media .v1-dots { color: var(--accent); opacity: 0.38; }
+  .v1-row.is-media .v1-num { color: var(--accent); font-weight: 600; }
+  .v1-media-emoji { font-size: 18px; line-height: 1; margin-right: 9px; }
+  .v1-media-name {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 17px;
+    color: var(--accent);
+    margin-right: 11px;
+  }
+  .v1-media-cap {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ═════════════════════════════════════ V3 — Media-count matrix ═════════════════════════════════════ */
+  .view-v3 { overflow-x: auto; }
+  .v3-table { min-width: 920px; display: flex; flex-direction: column; }
+  .v3-head, .v3-row {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.6fr) 130px repeat(5, 1fr);
+    align-items: center;
+    gap: 18px;
+  }
+  .v3-head {
+    padding: 4px 0 14px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .v3-row {
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .v3-h-lab {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .v3-h-lab.r { text-align: right; }
+  .v3-h-media {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    gap: 3px;
+  }
+  .v3-h-emoji { font-size: 22px; line-height: 1; }
+  .v3-h-name { font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-soft); line-height: 1.05; }
+  .v3-h-cap { font-family: var(--mono); font-size: 9px; letter-spacing: 0.03em; color: var(--muted); }
+  .v3-c-model { font-family: var(--sans); font-size: 13px; }
+  .v3-c-model .nm { font-weight: 600; }
+  .v3-c-params {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    text-align: right;
+    color: var(--ink);
+  }
+  .v3-c-words { display: block; font-size: 9.5px; color: var(--accent); opacity: 0.8; margin-top: 2px; }
+  .v3-c-count {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    text-align: right;
+    color: var(--ink);
+  }
+  .v3-c-count.zero { color: var(--muted); opacity: 0.45; }
+
+  /* Footer */
+  .footnotes {
+    max-width: 1280px;
+    margin: 80px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+  .footnotes strong { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 900px) {
+    body { padding: 32px 20px 80px; }
+    header.page-head { grid-template-columns: 1fr; }
+    .v1-row { grid-template-columns: 1fr; gap: 4px; }
+    .v1-label, .v1-media { width: auto; min-width: 0; }
+    .v1-media { justify-content: flex-start; flex-wrap: wrap; }
+    .view-v3 { overflow-x: auto; }
+  }
+  /* ═════════════════════════════════════ Growth timeline ═════════════════════════════════════ */
+  .view-timeline { overflow-x: auto; padding-bottom: 8px; }
+  .tl-plot { position: relative; margin: 0 auto; }
+  .tl-svg { position: absolute; inset: 0; overflow: visible; }
+  .tl-gridline { stroke: var(--grid); stroke-width: 1; }
+  .tl-grid-minor { opacity: 0.32; stroke-dasharray: 1 5; }
+  .tl-axis { stroke: var(--line); stroke-width: 1; }
+  .tl-bookline { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.55; }
+  .tl-frontier { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .tl-leader { stroke: var(--muted); stroke-width: 1; opacity: 0.5; }
+  .tl-dot { fill: var(--muted); }
+  .tl-dot-record { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+  .tl-year {
+    position: absolute;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+  }
+  .tl-ytick {
+    position: absolute;
+    transform: translateY(-50%);
+    right: 100%;
+    margin-right: 10px;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .tl-book {
+    position: absolute;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--accent);
+    line-height: 1.05;
+    background: var(--bg);
+    padding: 1px 7px 1px 4px;
+    border-radius: 3px;
+  }
+  .tl-book .tl-book-tok {
+    display: block;
+    font-family: var(--mono);
+    font-style: normal;
+    font-size: 9.5px;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+  .tl-lab {
+    position: absolute;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .tl-lab .nm { font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--ink); }
+  .tl-lab .sz { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-left: 5px; }
+  .tl-lab.left { text-align: right; }
+</style>
+</head>
+<body>
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">A scale primer · LLM context windows</p>
+      <h1 class="headline">It reads <em id="headline-max">2,000,000</em> tokens at once.</h1>
+      <p class="deck">A model's <em>context window</em> is how much text it can hold in mind at one time — measured in tokens. How much is that, really? Here each window shares one line with the <em>tokens</em> of text in books you know (a book's word count × ≈4/3). Read it directly: a 128K window is about <em>one Hobbit</em>; today's longest windows take in the <em>entire Harry Potter series</em> in a single prompt.</p>
+      <p class="datasrc" id="datasrc"><span class="dot"></span><span id="datasrc-text">Connecting to LLM Stats API…</span></p>
+    </div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button class="tab active" data-v="1">01 · Dot leader</button>
+      <button class="tab" data-v="2">02 · Growth</button>
+      <button class="tab" data-v="3">03 · Books that fit</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="filterbar" id="filterbar">
+      <div class="filter-field">
+        <label for="f-q">Search</label>
+        <input type="text" id="f-q" placeholder="model or company…" autocomplete="off" />
+      </div>
+      <div class="filter-field">
+        <label for="f-org">Company</label>
+        <select id="f-org"><option value="">All companies</option></select>
+      </div>
+      <div class="filter-field">
+        <label for="f-year">Year</label>
+        <select id="f-year"><option value="">All years</option></select>
+      </div>
+      <button class="filter-clear" id="f-clear" type="button">Clear</button>
+      <span class="filter-count" id="f-count"></span>
+    </div>
+    <div class="variation-caption">
+      <div id="cap-title"><span class="label-num">01</span>Dot leader</div>
+      <div class="desc" id="cap-desc">One row per model, sorted by context size. Dots fill leftward to the token count on the right. Famous books sit on the same line at their own token length — so you read each window as "this many books of text."</div>
+    </div>
+    <div id="root"></div>
+  </main>
+
+  <div class="footnotes">
+    <strong>METHOD</strong> · Context-window sizes come <strong>live from the <a href="https://docs.llm-stats.com/api-reference/introduction" style="color:inherit">LLM Stats API</a></strong> (<span id="fn-meta">loading…</span>): context lengths from the gateway catalog, release dates from the stats catalog, joined by model id. The window is the maximum input the model accepts, in tokens. Book figures use published word counts converted to tokens at ≈4/3 tokens per word — a page 300 words · a magazine feature 5K · a research paper 8K · Animal Farm 30K · Gatsby 47K · The Hobbit 95K · Moby-Dick 206K · War and Peace 587K · Harry Potter series 1.08M words. Anchors are tuned to the context range (≤2M tokens); larger texts would sit off-scale.
+  </div>
+
+  <script>
+// LLM context-window dataset — sourced LIVE from the LLM Stats API.
+//   docs: https://docs.llm-stats.com/api-reference/introduction
+//   data: context_length (gateway /v1/models) joined to release_date (stats catalog)
+// NOTE: the internal field `params` holds the CONTEXT LENGTH in tokens, so the shared
+// render code (scale, fold, timeline, matrix) works unchanged — only labels differ.
+// At runtime the page fetches context lengths LIVE, directly from the CORS-enabled
+// gateway catalog in the browser (see bottom of file); release dates are grafted from
+// this snapshot (they never change). The snapshot is also the offline fallback.
+window.MODELS_SNAPSHOT = [{"name": "GPT-3.5 Turbo", "params": 16385, "year": 2023, "date": "2023-03-21", "org": "OpenAI"}, {"name": "Step-3.5-Flash", "params": 65536, "year": 2026, "date": "2026-02-02", "org": "StepFun"}, {"name": "GPT-4 Turbo", "params": 128000, "year": 2024, "date": "2024-04-09", "org": "OpenAI"}, {"name": "GPT-4o", "params": 128000, "year": 2024, "date": "2024-05-13", "org": "OpenAI"}, {"name": "GPT-4o", "params": 128000, "year": 2024, "date": "2024-08-06", "org": "OpenAI"}, {"name": "GPT-5.3 Chat", "params": 128000, "year": 2026, "date": "2026-03-04", "org": "OpenAI"}, {"name": "Grok-3", "params": 128000, "year": 2025, "date": "2025-02-17", "org": "xAI"}, {"name": "LongCat-Flash-Chat", "params": 128000, "year": 2025, "date": "2025-08-29", "org": "Meituan"}, {"name": "Mercury 2", "params": 128000, "year": 2026, "date": "2026-02-24", "org": "Inception"}, {"name": "Qwen3 30B A3B", "params": 128000, "year": 2025, "date": "2025-04-29", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3 32B", "params": 128000, "year": 2025, "date": "2025-04-29", "org": "Alibaba Cloud / Qwen Team"}, {"name": "GPT OSS 120B", "params": 131000, "year": 2025, "date": "2025-08-05", "org": "OpenAI"}, {"name": "GPT OSS 120B High", "params": 131000, "year": 2025, "date": "2025-08-05", "org": "OpenAI"}, {"name": "DeepSeek-R1-0528", "params": 131072, "year": 2025, "date": "2025-05-28", "org": "DeepSeek"}, {"name": "DeepSeek-V3.2 (Non-thinking)", "params": 131072, "year": 2025, "date": "2025-12-01", "org": "DeepSeek"}, {"name": "Qwen3 VL 235B A22B Instruct", "params": 131072, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3 VL 8B Instruct", "params": 131072, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team"}, {"name": "DeepSeek-V3 0324", "params": 163840, "year": 2025, "date": "2025-03-25", "org": "DeepSeek"}, {"name": "Claude Haiku 4.5", "params": 200000, "year": 2025, "date": "2025-10-15", "org": "Anthropic"}, {"name": "Claude Sonnet 4.5", "params": 200000, "year": 2025, "date": "2025-09-29", "org": "Anthropic"}, {"name": "Claude Sonnet 4.6", "params": 200000, "year": 2026, "date": "2026-02-17", "org": "Anthropic"}, {"name": "GLM-5", "params": 200000, "year": 2026, "date": "2026-02-11", "org": "Zhipu AI"}, {"name": "GLM-5.1", "params": 200000, "year": 2026, "date": "2026-04-07", "org": "Zhipu AI"}, {"name": "MiniMax M2.7", "params": 204800, "year": 2026, "date": "2026-03-18", "org": "MiniMax"}, {"name": "Grok Code Fast 1", "params": 256000, "year": 2025, "date": "2025-08-28", "org": "xAI"}, {"name": "Mistral Medium 3.5", "params": 256000, "year": 2026, "date": "2026-04-29", "org": "Mistral AI"}, {"name": "Mistral Small 4", "params": 256000, "year": 2026, "date": "2026-03-16", "org": "Mistral AI"}, {"name": "Mistral Large 3 (675B Instruct 2512)", "params": 262100, "year": 2025, "date": "2025-12-04", "org": "Mistral AI"}, {"name": "Gemma 4 26B-A4B", "params": 262144, "year": 2026, "date": "2026-04-02", "org": "Google"}, {"name": "Gemma 4 31B", "params": 262144, "year": 2026, "date": "2026-04-02", "org": "Google"}, {"name": "Kimi K2.6", "params": 262144, "year": 2026, "date": "2026-04-20", "org": "Moonshot AI"}, {"name": "Nemotron 3 Nano (30B A3B)", "params": 262144, "year": 2025, "date": "2025-12-15", "org": "NVIDIA"}, {"name": "Qwen3 VL 4B Instruct", "params": 262144, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3 VL 4B Thinking", "params": 262144, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3 VL 8B Thinking", "params": 262144, "year": 2025, "date": "2025-09-22", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3.5-122B-A10B", "params": 262144, "year": 2026, "date": "2026-02-24", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3.5-27B", "params": 262144, "year": 2026, "date": "2026-02-24", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3.5-35B-A3B", "params": 262144, "year": 2026, "date": "2026-02-24", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3.5-397B-A17B", "params": 262144, "year": 2026, "date": "2026-02-16", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3.6-27B", "params": 262144, "year": 2026, "date": "2026-04-21", "org": "Alibaba Cloud / Qwen Team"}, {"name": "GPT-5 mini", "params": 400000, "year": 2025, "date": "2025-08-07", "org": "OpenAI"}, {"name": "GPT-5.1", "params": 400000, "year": 2025, "date": "2025-11-13", "org": "OpenAI"}, {"name": "GPT-5.1 Instant", "params": 400000, "year": 2025, "date": "2025-11-12", "org": "OpenAI"}, {"name": "GPT-5.1 Medium", "params": 400000, "year": 2025, "date": "2025-11-12", "org": "OpenAI"}, {"name": "GPT-5.2", "params": 400000, "year": 2025, "date": "2025-12-11", "org": "OpenAI"}, {"name": "GPT-5.2 Codex", "params": 400000, "year": 2026, "date": "2026-01-14", "org": "OpenAI"}, {"name": "GPT-5.3 Codex", "params": 400000, "year": 2026, "date": "2026-02-05", "org": "OpenAI"}, {"name": "GPT-5.4 mini", "params": 400000, "year": 2026, "date": "2026-03-17", "org": "OpenAI"}, {"name": "GPT-5.4 nano", "params": 400000, "year": 2026, "date": "2026-03-17", "org": "OpenAI"}, {"name": "GPT-5.5 Instant", "params": 400000, "year": 2026, "date": "2026-05-05", "org": "OpenAI"}, {"name": "Claude Opus 4.6", "params": 1000000, "year": 2026, "date": "2026-02-05", "org": "Anthropic"}, {"name": "Claude Opus 4.7", "params": 1000000, "year": 2026, "date": "2026-04-16", "org": "Anthropic"}, {"name": "Claude Opus 4.8", "params": 1000000, "year": 2026, "date": "2026-05-28", "org": "Anthropic"}, {"name": "GPT-5.4", "params": 1000000, "year": 2026, "date": "2026-03-05", "org": "OpenAI"}, {"name": "Gemini 3 Flash", "params": 1000000, "year": 2025, "date": "2025-12-17", "org": "Google"}, {"name": "Grok 4.3", "params": 1000000, "year": 2026, "date": "2026-05-06", "org": "xAI"}, {"name": "MiniMax M2", "params": 1000000, "year": 2025, "date": "2025-10-27", "org": "MiniMax"}, {"name": "MiniMax M2.1", "params": 1000000, "year": 2025, "date": "2025-12-23", "org": "MiniMax"}, {"name": "MiniMax M2.5", "params": 1000000, "year": 2026, "date": "2026-02-12", "org": "MiniMax"}, {"name": "Qwen3.6 Plus", "params": 1000000, "year": 2026, "date": "2026-03-31", "org": "Alibaba Cloud / Qwen Team"}, {"name": "Qwen3.7 Max", "params": 1000000, "year": 2026, "date": "2026-05-19", "org": "Alibaba Cloud / Qwen Team"}, {"name": "GPT-4.1", "params": 1047576, "year": 2025, "date": "2025-04-14", "org": "OpenAI"}, {"name": "GPT-4.1 mini", "params": 1047576, "year": 2025, "date": "2025-04-14", "org": "OpenAI"}, {"name": "GPT-4.1 nano", "params": 1047576, "year": 2025, "date": "2025-04-14", "org": "OpenAI"}, {"name": "DeepSeek-V4-Flash-Max", "params": 1048576, "year": 2026, "date": "2026-04-23", "org": "DeepSeek"}, {"name": "DeepSeek-V4-Pro-Max", "params": 1048576, "year": 2026, "date": "2026-04-23", "org": "DeepSeek"}, {"name": "Gemini 2.5 Flash", "params": 1048576, "year": 2025, "date": "2025-05-20", "org": "Google"}, {"name": "Gemini 2.5 Pro", "params": 1048576, "year": 2025, "date": "2025-05-20", "org": "Google"}, {"name": "Gemini 3.1 Pro", "params": 1048576, "year": 2026, "date": "2026-02-19", "org": "Google"}, {"name": "Gemini 3.5 Flash", "params": 1048576, "year": 2026, "date": "2026-05-19", "org": "Google"}, {"name": "GPT-5.5", "params": 1050000, "year": 2026, "date": "2026-04-23", "org": "OpenAI"}, {"name": "Grok 4 Fast", "params": 2000000, "year": 2025, "date": "2025-08-28", "org": "xAI"}, {"name": "Grok-4 Fast Non-Reasoning", "params": 2000000, "year": 2025, "date": "2025-08-28", "org": "xAI"}, {"name": "Grok-4 Fast Reasoning", "params": 2000000, "year": 2025, "date": "2025-08-28", "org": "xAI"}, {"name": "Grok-4.1 Fast Non-Reasoning", "params": 2000000, "year": 2025, "date": "2025-11-17", "org": "xAI"}, {"name": "Grok-4.1 Fast Reasoning", "params": 2000000, "year": 2025, "date": "2025-11-17", "org": "xAI"}];
+
+// Assemble the working set; live data swaps in once the proxy responds.
+window.MODELS = window.MODELS_SNAPSHOT.slice();
+
+// ─── Filters: by organization (company) and release year. ───
+window.FILTERS = { q: "", org: "", year: "" };
+
+window.matchFilter = function (m) {
+  if (m.name === "one parameter") return true; // always keep the "1" anchor
+  const F = window.FILTERS;
+  if (F.org && m.org !== F.org) return false;
+  if (F.year && String(m.year) !== String(F.year)) return false;
+  if (F.q) {
+    const q = F.q.toLowerCase();
+    if (!((m.name || "").toLowerCase().includes(q) ||
+          (m.org || "").toLowerCase().includes(q))) return false;
+  }
+  return true;
+};
+
+// The filtered set every view renders from (anchor + matching models, size order).
+window.activeModels = function () {
+  return window.MODELS.filter(window.matchFilter);
+};
+
+// English text converts to tokens at roughly 4/3 of its word count.
+window.TOKENS_PER_WORD = 4 / 3;
+
+// Famous books, by published word count. Multiply by ~4/3 and each book's text
+// becomes a token count — a plain number that sits on the SAME line as the
+// context windows (in tokens). A book lands at the token length of its text, so
+// "this window holds N copies of The Hobbit" reads directly off the scale.
+// Context tops out around 2M tokens, so the anchors are tuned to the 400 → ~1.5M
+// range — finely spaced where the models actually live, with nothing far off-scale.
+window.BOOKS = [
+  { emoji: "📄", label: "printed pages",          one: "a printed page",          words: 300 },
+  { emoji: "📰", label: "magazine features",      one: "a magazine feature",      words: 5_000 },
+  { emoji: "📑", label: "research papers",        one: "a research paper",        words: 8_000 },
+  { emoji: "📓", label: "copies of Animal Farm",  one: "Animal Farm",             words: 30_000 },
+  { emoji: "📗", label: "copies of Gatsby",       one: "The Great Gatsby",        words: 47_000 },
+  { emoji: "🧙", label: "copies of The Hobbit",   one: "The Hobbit",              words: 95_000 },
+  { emoji: "📘", label: "copies of Moby-Dick",    one: "Moby-Dick",               words: 206_000 },
+  { emoji: "📕", label: "War & Peaces",           one: "War and Peace",           words: 587_000 },
+  { emoji: "📚", label: "Harry Potter sets",      one: "the Harry Potter series", words: 1_084_000 },
+];
+
+// Sort by params ascending so all variations render in scale order.
+window.MODELS.sort((a, b) => a.params - b.params);
+
+// THE KEY IDEA: books are not a side note — they ARE points on the same number
+// line as the models. A book of W words converts to ~W·4/3 tokens; that token
+// count is a plain number we drop straight onto the parameter axis. mergedScale()
+// weaves models + books into one list, sorted by size, so every book lands
+// BETWEEN the models it sits between.
+window.bookTokens = function (b) { return Math.round(b.words * window.TOKENS_PER_WORD); };
+
+window.mergedScale = function () {
+  const models = window.activeModels().map((m) => Object.assign({ type: "model" }, m));
+  const books = window.BOOKS.map((b) => {
+    const tokens = window.bookTokens(b);
+    return Object.assign({ type: "media", params: tokens, tokens }, b);
+  });
+  return models.concat(books).sort((a, b) => a.params - b.params);
+};
+
+// Variation 1: "Dot leader"
+// Faithful to the reference: each row has dots filling the space leading up
+// to a right-aligned number. The total row width is uniform; as the number
+// grows wider (one more digit, more commas), it physically eats into the dot
+// run on its left — that's the "carry" mechanic. Dots are real glyphs in a
+// monospaced grid so the digit positions and dot positions stay aligned.
+
+// Which fold-groups are expanded (keyed by the shared param count). Persists
+// across re-renders so toggling a filter doesn't re-collapse everything.
+window.expandedGroups = window.expandedGroups || new Set();
+
+// The fixed-width monospaced [dots + number] field shared by every row.
+function v1Field(params) {
+  const COLS = 42;
+  const numStr = Math.round(params).toLocaleString("en-US");
+  const dotCells = Math.max(0, COLS - numStr.length - 1);
+  let dotStr = "";
+  for (let i = 0; i < dotCells; i++) {
+    dotStr += (i % 2 === (dotCells % 2 === 0 ? 0 : 1)) ? "." : " ";
+  }
+  const field = document.createElement("div");
+  field.className = "v1-field";
+  const dots = document.createElement("span");
+  dots.className = "v1-dots";
+  dots.textContent = dotStr;
+  field.appendChild(dots);
+  const num = document.createElement("span");
+  num.className = "v1-num";
+  num.textContent = " " + numStr;
+  field.appendChild(num);
+  return field;
+}
+
+// tokens → words: a window of T tokens holds about T ÷ (4/3) words of English.
+window.tokensToWords = function (t) { return Math.round(t / window.TOKENS_PER_WORD); };
+
+function v1ModelLabelHTML(m) {
+  if (m.name === "one parameter") return `<span class="v1-label-name muted">${m.name}</span>`;
+  return `<span class="v1-label-name">${escapeHtml(m.name)}</span>` +
+    (m.org ? `<span class="v1-label-org"> · ${escapeHtml(m.org)}</span>` : "") +
+    (m.year ? `<span class="v1-label-year"> ${m.year}</span>` : "") +
+    `<span class="v1-label-words"> · ≈ ${window.tokensToWords(m.params).toLocaleString("en-US")} words</span>`;
+}
+
+window.renderV1 = function (root) {
+  root.innerHTML = "";
+  root.className = "view view-v1";
+
+  const items = window.mergedScale();
+  if (!items.some((it) => it.type === "model")) {
+    root.innerHTML = '<p class="empty-msg">No models match the current filters.</p>';
+    return;
+  }
+
+  let i = 0;
+  while (i < items.length) {
+    const it = items[i];
+
+    // Books / media markers — always their own row.
+    if (it.type === "media") {
+      const row = document.createElement("div");
+      row.className = "v1-row is-media";
+      row.appendChild(v1Field(it.params));
+      const label = document.createElement("div");
+      label.className = "v1-label";
+      label.innerHTML =
+        `<span class="v1-media-emoji">${it.emoji}</span>` +
+        `<span class="v1-media-name">${escapeHtml(it.one)}</span>` +
+        `<span class="v1-media-cap">${it.words.toLocaleString("en-US")} words ≈ this many tokens of text</span>`;
+      row.appendChild(label);
+      root.appendChild(row);
+      i++;
+      continue;
+    }
+
+    // Models: gather the run of consecutive models that share this exact size.
+    let j = i;
+    const grp = [];
+    while (j < items.length && items[j].type === "model" && items[j].params === it.params) {
+      grp.push(items[j]);
+      j++;
+    }
+
+    if (grp.length === 1) {
+      const row = document.createElement("div");
+      row.className = "v1-row";
+      row.appendChild(v1Field(it.params));
+      const label = document.createElement("div");
+      label.className = "v1-label";
+      label.innerHTML = v1ModelLabelHTML(grp[0]);
+      row.appendChild(label);
+      root.appendChild(row);
+    } else {
+      // Collapsible group: one header on the scale, N models tucked underneath.
+      const key = it.params;
+      const open = window.expandedGroups.has(key);
+      const head = document.createElement("div");
+      head.className = "v1-row v1-group-head" + (open ? " is-open" : "");
+      head.appendChild(v1Field(it.params));
+      const orgs = [...new Set(grp.map((g) => g.org).filter(Boolean))];
+      const orgTxt = orgs.slice(0, 3).join(", ") + (orgs.length > 3 ? ` +${orgs.length - 3} more` : "");
+      const label = document.createElement("div");
+      label.className = "v1-label";
+      label.innerHTML =
+        `<span class="v1-caret">▸</span>` +
+        `<span class="v1-group-count">${grp.length} models</span>` +
+        `<span class="v1-label-org"> · ${escapeHtml(orgTxt)}</span>` +
+        `<span class="v1-label-words"> · ≈ ${window.tokensToWords(it.params).toLocaleString("en-US")} words</span>`;
+      head.appendChild(label);
+
+      const kids = document.createElement("div");
+      kids.className = "v1-group-kids";
+      kids.style.display = open ? "" : "none";
+      grp.forEach((g) => {
+        const kr = document.createElement("div");
+        kr.className = "v1-kid";
+        kr.innerHTML = v1ModelLabelHTML(g);
+        kids.appendChild(kr);
+      });
+
+      head.addEventListener("click", () => {
+        const nowOpen = kids.style.display === "none";
+        kids.style.display = nowOpen ? "" : "none";
+        head.classList.toggle("is-open", nowOpen);
+        if (nowOpen) window.expandedGroups.add(key);
+        else window.expandedGroups.delete(key);
+      });
+
+      root.appendChild(head);
+      root.appendChild(kids);
+    }
+    i = j;
+  }
+};
+
+// Full count (matrix): integer with thousands separators, "—" below one.
+function fmtCount(n) {
+  if (n < 1) return "—";
+  return Math.round(n).toLocaleString("en-US");
+}
+window.fmtCount = fmtCount;
+
+// Short count (inline chips): 176K, 5.7K, 36, "—".
+function fmtShort(n) {
+  if (n < 1) return "—";
+  if (n < 1000) return String(Math.round(n));
+  if (n < 1e6) { const v = n / 1e3; return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : Math.round(v)) + "K"; }
+  if (n < 1e9) { const v = n / 1e6; return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : Math.round(v)) + "M"; }
+  const v = n / 1e9; return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : Math.round(v)) + "B";
+}
+window.fmtShort = fmtShort;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+window.escapeHtml = escapeHtml;
+
+// Variation 2: "Growth timeline"
+// Plots every model by release date (x) against its context window (log y), draws a
+// climbing "frontier" line through the record-setters, and overlays famous books as
+// horizontal reference lines — so you can read off when windows grew past Gatsby,
+// The Hobbit, Moby-Dick, War and Peace, the whole Harry Potter series.
+
+// Compact token formatter: 2K · 16K · 128K · 262K · 1M · 2M.
+window.fmtParamsShort = function (p) {
+  if (p >= 1e9) { const b = p / 1e9; return (b < 10 ? b.toFixed(1) : Math.round(b)) + "B"; }
+  if (p >= 1e6) { const m = p / 1e6; return (m < 10 ? (Math.round(m * 10) / 10) : Math.round(m)) + "M"; }
+  if (p >= 1e3) { const k = p / 1e3; return (k < 10 ? (Math.round(k * 10) / 10) : Math.round(k)) + "K"; }
+  return String(p);
+};
+
+window.renderTimeline = function (root) {
+  root.innerHTML = "";
+  root.className = "view view-timeline";
+
+  const models = window.activeModels().filter((m) => m.year);
+  if (!models.length) { root.innerHTML = '<p class="empty-msg">No models match the current filters.</p>'; return; }
+
+  // Position each model by its precise RELEASE DATE (fractional year), not just the
+  // integer year — otherwise a few years of data stack into vertical strips. The
+  // continuous time axis spreads the dots into a real scatter.
+  const tOf = (m) => {
+    if (m.date) { const p = m.date.split("-"); return +p[0] + ((+p[1] - 1) + (+p[2] - 1) / 31) / 12; }
+    return m.year + 0.5;
+  };
+  models.forEach((m) => (m._t = tOf(m)));
+
+  const ts = models.map((m) => m._t);
+  const Y0 = Math.floor(Math.min(...ts) * 4) / 4 - 0.05;   // pad left a touch
+  const Y1 = Math.max(...ts) + 0.18;                        // breathing room on the right
+  const ps = models.map((m) => m.params);
+  const LOG_MIN = Math.floor(Math.log10(Math.min(...ps)));
+  const LOG_MAX = Math.ceil(Math.log10(Math.max(...ps)));
+
+  const M = { t: 30, r: 42, b: 40, l: 64 };
+  const plotW = 860, plotH = 540;
+  const W = plotW + M.l + M.r, H = plotH + M.t + M.b;
+
+  const xFor = (t) => M.l + ((t - Y0) / (Y1 - Y0)) * plotW;
+  const yFor = (p) => M.t + (1 - (Math.log10(p) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * plotH;
+
+  const plot = document.createElement("div");
+  plot.className = "tl-plot";
+  plot.style.width = W + "px";
+  plot.style.height = H + "px";
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "tl-svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const mk = (tag, attrs) => {
+    const el = document.createElementNS(svgNS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  };
+
+  // y gridlines + ticks (per decade)
+  for (let e = Math.ceil(LOG_MIN); e <= Math.floor(LOG_MAX); e++) {
+    const y = yFor(Math.pow(10, e));
+    svg.appendChild(mk("line", { class: "tl-gridline", x1: M.l, y1: y, x2: M.l + plotW, y2: y }));
+    const tick = document.createElement("div");
+    tick.className = "tl-ytick";
+    tick.style.left = M.l + "px";
+    tick.style.top = y + "px";
+    tick.textContent = window.fmtParamsShort(Math.pow(10, e));
+    plot.appendChild(tick);
+  }
+
+  // x gridlines: a solid line + label at each whole year, faint ticks at quarters.
+  for (let yr = Math.ceil(Y0); yr <= Math.floor(Y1); yr++) {
+    const x = xFor(yr);
+    svg.appendChild(mk("line", { class: "tl-gridline", x1: x, y1: M.t, x2: x, y2: M.t + plotH }));
+    const yl = document.createElement("div");
+    yl.className = "tl-year";
+    yl.style.left = x + "px";
+    yl.style.top = (M.t + plotH + 18) + "px";
+    yl.textContent = yr;
+    plot.appendChild(yl);
+    for (let q = 1; q <= 3; q++) {
+      const xq = xFor(yr + q / 4);
+      if (xq < M.l || xq > M.l + plotW) continue;
+      svg.appendChild(mk("line", { class: "tl-gridline tl-grid-minor", x1: xq, y1: M.t, x2: xq, y2: M.t + plotH }));
+    }
+  }
+
+  // axes
+  svg.appendChild(mk("line", { class: "tl-axis", x1: M.l, y1: M.t, x2: M.l, y2: M.t + plotH }));
+  svg.appendChild(mk("line", { class: "tl-axis", x1: M.l, y1: M.t + plotH, x2: M.l + plotW, y2: M.t + plotH }));
+
+  // book reference lines
+  const refBooks = window.BOOKS.filter((b) => {
+    const l = Math.log10(window.bookTokens(b));
+    return l >= LOG_MIN && l <= LOG_MAX;
+  });
+  refBooks.forEach((b) => {
+    const y = yFor(window.bookTokens(b));
+    svg.appendChild(mk("line", { class: "tl-bookline", x1: M.l, y1: y, x2: M.l + plotW, y2: y }));
+    const lab = document.createElement("div");
+    lab.className = "tl-book";
+    lab.style.left = (M.l + 8) + "px";
+    lab.style.top = (y - 11) + "px";
+    lab.innerHTML = `${b.emoji} ${escapeHtml(b.one)}` +
+      `<span class="tl-book-tok">${window.fmtParamsShort(window.bookTokens(b))} tokens</span>`;
+    plot.appendChild(lab);
+  });
+
+  // frontier = running all-time max as time progresses (by release date)
+  const byDate = models.slice().sort((a, b) => a._t - b._t || a.params - b.params);
+  let max = 0;
+  const records = [];
+  byDate.forEach((m) => { if (m.params > max) { max = m.params; records.push(m); } });
+
+  // frontier polyline (step through record points), extended flat to today's edge
+  const pts = records.map((m) => `${xFor(m._t)},${yFor(m.params)}`);
+  if (records.length) pts.push(`${xFor(Y1)},${yFor(records[records.length - 1].params)}`);
+  svg.appendChild(mk("polyline", { class: "tl-frontier", points: pts.join(" ") }));
+
+  // ── label layout: de-collide vertically, leader lines back to each dot ──
+  const GAP = 18;
+  const TOP = M.t, BOT = M.t + plotH;
+  function decollide(group) {
+    group.sort((a, b) => a.dy - b.dy);
+    group.forEach((g) => (g.ly = g.dy));
+    for (let i = 1; i < group.length; i++)
+      if (group[i].ly < group[i - 1].ly + GAP) group[i].ly = group[i - 1].ly + GAP;
+    if (group.length && group[group.length - 1].ly > BOT) {
+      group[group.length - 1].ly = BOT;
+      for (let i = group.length - 2; i >= 0; i--)
+        if (group[i].ly > group[i + 1].ly - GAP) group[i].ly = group[i + 1].ly - GAP;
+    }
+    if (group.length && group[0].ly < TOP) {
+      group[0].ly = TOP;
+      for (let i = 1; i < group.length; i++)
+        if (group[i].ly < group[i - 1].ly + GAP) group[i].ly = group[i - 1].ly + GAP;
+    }
+  }
+
+  // Every frontier record-setter gets a label. Now that dots are spread along a
+  // continuous time axis, the records no longer pile on one x — de-collide + leader
+  // lines keep them tidy, the way the original plot read.
+  const labs = records.map((m) => ({
+    m, dx: xFor(m._t), dy: yFor(m.params),
+    onRight: (xFor(m._t) - M.l) / plotW > 0.62,
+  }));
+  decollide(labs); // one global pass so no two labels ever share a row, regardless of side
+
+  // leader lines (under the dots)
+  labs.forEach((L) => {
+    const ax = L.onRight ? L.dx - 9 : L.dx + 9;
+    svg.appendChild(mk("line", { class: "tl-leader", x1: L.dx, y1: L.dy, x2: ax, y2: L.ly }));
+  });
+
+  // dots
+  const recordSet = new Set(records);
+  models.forEach((m) => {
+    const isRec = recordSet.has(m);
+    svg.appendChild(mk("circle", {
+      class: isRec ? "tl-dot-record" : "tl-dot",
+      cx: xFor(m._t), cy: yFor(m.params), r: isRec ? 5 : 3,
+    }));
+  });
+
+  plot.appendChild(svg);
+
+  // label elements
+  labs.forEach((L) => {
+    const el = document.createElement("div");
+    el.className = "tl-lab" + (L.onRight ? " left" : "");
+    el.style.top = L.ly + "px";
+    if (L.onRight) {
+      el.style.left = (L.dx - 11) + "px";
+      el.style.transform = "translate(-100%, -50%)";
+    } else {
+      el.style.left = (L.dx + 11) + "px";
+      el.style.transform = "translateY(-50%)";
+    }
+    el.innerHTML = `<span class="nm">${escapeHtml(L.m.name)}</span>` +
+      `<span class="sz">${window.fmtParamsShort(L.m.params)}</span>`;
+    plot.appendChild(el);
+  });
+
+  root.appendChild(plot);
+};
+
+// Variation 3: "Book-count matrix"
+// One column per book. Each cell answers: how many copies of THIS book's text
+// would it take to equal the model's parameter count in tokens (~4/3 per word)?
+// Reading down a column shows the explosion of scale; reading across a row
+// shows what one model's parameter count actually means in books you know.
+
+window.renderV3 = function (root) {
+  const data = window.activeModels();
+  root.innerHTML = "";
+  root.className = "view view-v3";
+
+  // Only books small enough that at least the biggest window could hold one —
+  // columns for an entire encyclopedia would be all dashes.
+  const maxCtx = data.length ? Math.max(...data.map((m) => m.params)) : 0;
+  const books = window.BOOKS.filter((b) => window.bookTokens(b) <= maxCtx);
+
+  const table = document.createElement("div");
+  table.className = "v3-table";
+  const cols = `minmax(190px, 1.4fr) 132px repeat(${books.length}, minmax(66px, 1fr))`;
+  table.style.minWidth = (342 + books.length * 78) + "px";
+
+  // Header row — book identity (emoji · name · word count)
+  const head = document.createElement("div");
+  head.className = "v3-head";
+  head.style.gridTemplateColumns = cols;
+  head.innerHTML =
+    `<div class="v3-h-lab">Model</div>` +
+    `<div class="v3-h-lab r">Context window</div>` +
+    books.map((b) =>
+      `<div class="v3-h-media">` +
+        `<span class="v3-h-emoji">${b.emoji}</span>` +
+        `<span class="v3-h-name">${escapeHtml(b.one)}</span>` +
+        `<span class="v3-h-cap">${b.words.toLocaleString("en-US")} words</span>` +
+      `</div>`
+    ).join("");
+  table.appendChild(head);
+
+  data.forEach((m) => {
+    const numStr = m.params.toLocaleString("en-US");
+    const row = document.createElement("div");
+    row.className = "v3-row";
+    row.style.gridTemplateColumns = cols;
+
+    let html =
+      `<div class="v3-c-model">` +
+      (m.name === "one parameter"
+        ? `<span class="muted">${m.name}</span>`
+        : `<span class="nm">${escapeHtml(m.name)}</span>` +
+          (m.org ? ` <span class="muted">· ${escapeHtml(m.org)}</span>` : "")) +
+      `</div>` +
+      `<div class="v3-c-params">${numStr}<span class="v3-c-words">≈ ${window.tokensToWords(m.params).toLocaleString("en-US")} words</span></div>`;
+
+    books.forEach((b) => {
+      const c = m.params / window.bookTokens(b);
+      const z = c < 1 ? " zero" : "";
+      // "How many whole copies fit." Dash when not even one does. Compact counts
+      // keep columns from colliding; title carries the precise figure.
+      html += `<div class="v3-c-count${z}" title="${fmtCount(c)}">${window.fmtShort(c)}</div>`;
+    });
+
+    row.innerHTML = html;
+    table.appendChild(row);
+  });
+
+  root.appendChild(table);
+};
+
+  </script>
+  <script>
+    const captions = {
+      "1": { title: "Dot leader", desc: "Every context window and famous books share one token axis, sorted by size. The accent rows are books — each sits at the token length of its text (≈4/3 of its word count). Read the gaps: a window lands between two books, so you see exactly how much text it can hold." },
+      "2": { title: "Growth", desc: "When did context windows reach each size? Every model plotted by release date against its window (log scale). The accent line tracks the climbing frontier; the dashed lines mark famous books — read off when windows grew past Gatsby, Moby-Dick, War and Peace, the whole Harry Potter series." },
+      "3": { title: "Books that fit", desc: "How many copies of each book's text fit inside the context window. Read across one row — pages · features · papers · Animal Farm · Gatsby · The Hobbit · Moby-Dick · War and Peace · Harry Potter. A dash means not even one whole copy fits." },
+    };
+
+    let currentView = "1";
+
+    function render(n) {
+      currentView = n;
+      const root = document.getElementById("root");
+      const fn = { "1": window.renderV1, "2": window.renderTimeline, "3": window.renderV3 }[n] || window.renderV1;
+      fn(root);
+      const c = captions[n];
+      document.getElementById("cap-title").innerHTML = `<span class="label-num">0${n}</span>${c.title}`;
+      document.getElementById("cap-desc").textContent = c.desc;
+      document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.v === n));
+      updateCount();
+    }
+
+    // ─── Filter controls ───
+    function modelsOnly() { return window.MODELS.filter((m) => m.name !== "one parameter"); }
+
+    function populateFilters() {
+      const all = modelsOnly();
+      const orgSel = document.getElementById("f-org");
+      const yearSel = document.getElementById("f-year");
+      const orgs = [...new Set(all.map((m) => m.org).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const years = [...new Set(all.map((m) => m.year).filter(Boolean))].sort((a, b) => b - a);
+      orgSel.innerHTML = `<option value="">All companies</option>` +
+        orgs.map((o) => `<option value="${o.replace(/"/g, "&quot;")}">${o}</option>`).join("");
+      yearSel.innerHTML = `<option value="">All years</option>` +
+        years.map((y) => `<option value="${y}">${y}</option>`).join("");
+      orgSel.value = window.FILTERS.org;
+      yearSel.value = window.FILTERS.year;
+    }
+
+    function updateCount() {
+      const shown = window.activeModels().filter((m) => m.name !== "one parameter").length;
+      const total = modelsOnly().length;
+      const el = document.getElementById("f-count");
+      if (el) el.textContent = shown === total ? `${total} models` : `${shown} of ${total} models`;
+    }
+
+    document.getElementById("f-q").addEventListener("input", (e) => {
+      window.FILTERS.q = e.target.value.trim();
+      render(currentView);
+    });
+    document.getElementById("f-org").addEventListener("change", (e) => {
+      window.FILTERS.org = e.target.value;
+      render(currentView);
+    });
+    document.getElementById("f-year").addEventListener("change", (e) => {
+      window.FILTERS.year = e.target.value;
+      render(currentView);
+    });
+    document.getElementById("f-clear").addEventListener("click", () => {
+      window.FILTERS = { q: "", org: "", year: "" };
+      document.getElementById("f-q").value = "";
+      document.getElementById("f-org").value = "";
+      document.getElementById("f-year").value = "";
+      render(currentView);
+    });
+
+    document.getElementById("tabs").addEventListener("click", (e) => {
+      const t = e.target.closest(".tab");
+      if (!t) return;
+      render(t.dataset.v);
+      try { localStorage.setItem("llm-scale-v", t.dataset.v); } catch (_) {}
+    });
+
+    // ─── Data plumbing: assemble MODELS, keep the headline + footnote in sync ───
+    function setModels(list) {
+      window.MODELS = list.slice();
+      window.MODELS.sort((a, b) => a.params - b.params);
+      const max = window.MODELS.length ? window.MODELS[window.MODELS.length - 1].params : 0;
+      document.getElementById("headline-max").textContent = Math.round(max).toLocaleString("en-US");
+      populateFilters();
+    }
+
+    function setStatus(mode, count, when) {
+      const el = document.getElementById("datasrc");
+      const txt = document.getElementById("datasrc-text");
+      const fn = document.getElementById("fn-meta");
+      el.classList.remove("is-live", "is-snapshot");
+      if (mode === "live") {
+        el.classList.add("is-live");
+        const t = when ? new Date(when * 1000).toLocaleString() : "just now";
+        txt.textContent = `Live · LLM Stats API · ${count} models · updated ${t}`;
+        fn.textContent = `live · ${count} models · fetched ${t}`;
+      } else {
+        el.classList.add("is-snapshot");
+        txt.textContent = `Offline snapshot · ${count} models`;
+        fn.textContent = `embedded snapshot · ${count} models`;
+      }
+    }
+
+    // Initial paint from the embedded snapshot so the page is never blank.
+    setModels(window.MODELS_SNAPSHOT);
+    const initial = (() => { try { const v = localStorage.getItem("llm-scale-v"); return (v === "1" || v === "2" || v === "3") ? v : "1"; } catch (_) { return "1"; } })();
+    render(initial);
+    setStatus("snapshot", window.MODELS_SNAPSHOT.length);
+
+    // ─── Live data: fetch DIRECTLY from the LLM Stats gateway in the browser. ───
+    // The gateway catalog (/v1/models) is CORS-enabled, so this static page (e.g. on
+    // GitHub Pages) reads it with no server, refreshing on every load. It carries
+    // context_length + organization but NOT release dates — those are immutable, so we
+    // graft them from the snapshot by model name (models the snapshot doesn't know just
+    // won't appear on the dated growth view). NOTE: this API key ships in the page and
+    // is publicly visible once deployed — use a throwaway key and rotate it if it leaks.
+    const GATEWAY = "https://api.llm-stats.com/v1/models";
+    const API_KEY = "sk_ze_b5rXc5zLCUt8m5kg7DeB2PcBD4k2uz_N23_0hmzmqO0";
+
+    const dateByName = new Map(window.MODELS_SNAPSHOT.map((m) => [m.name, { date: m.date, year: m.year }]));
+
+    fetch(GATEWAY, { headers: { Authorization: "Bearer " + API_KEY } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+      .then((d) => {
+        const list = Array.isArray(d) ? d : (d.models || []);
+        const models = list
+          .filter((g) => g.context_length)
+          .map((g) => {
+            const name = g.display_name || g.model_name;
+            const dm = dateByName.get(name) || {};
+            return {
+              name,
+              params: Number(g.context_length),   // internal field = context length (tokens)
+              org: g.organization_name || null,
+              date: dm.date || null,
+              year: dm.year || null,
+            };
+          });
+        if (!models.length) throw new Error("empty");
+        setModels(models);
+        render(currentView);
+        setStatus("live", models.length, Math.floor(Date.now() / 1000));
+      })
+      .catch(() => { /* keep snapshot; status already reflects it */ });
+  </script>
+</body>
+</html>

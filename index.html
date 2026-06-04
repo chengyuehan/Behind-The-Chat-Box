@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Behind the chat box — four views on the numbers behind large language models</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3eee3;
+    --bg-card: #f8f4ec;
+    --ink: #161512;
+    --ink-soft: #5b574f;
+    --muted: #9d978a;
+    --line: #d6cfbe;
+    --accent: #c54a2c;
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ───────── Top exhibition bar ───────── */
+  .topbar {
+    flex: none;
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--ink);
+    background: var(--bg);
+    box-shadow: 0 1px 0 var(--line), 0 10px 30px -22px rgba(0,0,0,0.4);
+    z-index: 5;
+  }
+
+  .brand {
+    appearance: none;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--line);
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 12px 22px;
+    min-width: 218px;
+    cursor: pointer;
+    transition: background 0.16s ease;
+  }
+  .brand:hover { background: rgba(0,0,0,0.04); }
+  .brand:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .brand .eyebrow {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .brand .home-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.16s ease;
+  }
+  .brand.is-home .home-dot { background: var(--accent); }
+  .brand .wordmark {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 27px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .brand .wordmark em { font-style: italic; color: var(--accent); }
+
+  /* tabs */
+  .tabs {
+    display: flex;
+    flex: 1 1 480px;
+    min-width: 0;
+  }
+  .tab {
+    flex: 1 1 0;
+    min-width: 0;
+    appearance: none;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--line);
+    text-align: left;
+    padding: 11px 18px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--ink);
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+  .tab:last-child { border-right: none; }
+  .tab:hover { background: rgba(0,0,0,0.045); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tab .t-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+  .tab .t-name {
+    font-family: var(--serif);
+    font-size: 21px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .tab .t-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tab[aria-selected="true"] {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .tab[aria-selected="true"] .t-num { color: var(--accent); }
+  .tab[aria-selected="true"] .t-tag { color: rgba(243,238,227,0.62); }
+
+  /* right-side meta */
+  .meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 5px;
+    padding: 10px 20px;
+    border-left: 1px solid var(--line);
+    min-width: 150px;
+  }
+  .meta .standalone {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    border: 1px solid var(--ink);
+    padding: 7px 11px;
+    transition: background 0.16s ease, color 0.16s ease;
+    white-space: nowrap;
+  }
+  .meta .standalone:hover { background: var(--ink); color: var(--bg); }
+  .meta .hint {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .meta .hint kbd {
+    font-family: var(--mono);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 9px;
+    color: var(--ink-soft);
+  }
+
+  /* ───────── Viewport hosting the home panel + iframes ───────── */
+  .viewport {
+    flex: 1 1 auto;
+    position: relative;
+    min-height: 0;
+    background: var(--bg);
+  }
+  /* Inactive panels are display:none so offscreen pages (e.g. the animated
+     fuel station) pause instead of burning CPU. Each iframe is mounted once,
+     while visible, then kept in the DOM so its state survives. */
+  .frame {
+    position: absolute;
+    inset: 0;
+    display: none;
+  }
+  .frame.is-active {
+    display: block;
+    animation: frameIn 0.24s ease;
+  }
+  @keyframes frameIn { from { opacity: 0; } to { opacity: 1; } }
+  .frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    background: var(--bg);
+  }
+
+  /* loading shimmer behind each iframe until it reports load */
+  .frame .loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: var(--bg);
+    transition: opacity 0.3s ease;
+  }
+  .frame.loaded .loader { opacity: 0; pointer-events: none; }
+  .loader .dot {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.3s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.8); } }
+  .loader .lbl {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ───────── Home / landing panel ───────── */
+  .frame.home { overflow-y: auto; }
+  .home-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(40px, 6vw, 76px) clamp(22px, 5vw, 48px) 72px;
+  }
+
+  .hero {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: clamp(28px, 4vw, 44px);
+    margin-bottom: clamp(30px, 4vw, 46px);
+  }
+  .hero .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .hero .eyebrow .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .hero-title {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(52px, 9vw, 116px);
+    line-height: 0.94;
+    letter-spacing: -0.025em;
+    margin: 0;
+  }
+  .hero-title em { font-style: italic; color: var(--accent); }
+  .hero-deck {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(18px, 2.1vw, 23px);
+    line-height: 1.45;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 26px 0 0;
+  }
+  .hero-deck b { font-style: normal; font-weight: 400; color: var(--ink); }
+  .hero-body {
+    margin: 22px 0 0;
+    max-width: 70ch;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .hero-body p {
+    font-family: var(--sans);
+    font-size: clamp(13.5px, 1.05vw, 15px);
+    line-height: 1.72;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .hero-body b { font-weight: 600; color: var(--ink); }
+  .hero-cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 26px;
+  }
+  .gh-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    border: 1px solid var(--ink);
+    padding: 9px 15px;
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+  .gh-link:hover { background: var(--ink); color: var(--bg); }
+  .gh-link svg { display: block; }
+  .hero-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin-top: 24px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .hero-foot span { display: inline-flex; align-items: center; gap: 8px; }
+  .hero-foot span::before {
+    content: ""; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--accent); opacity: 0.7;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .card {
+    position: relative;
+    text-align: left;
+    appearance: none;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    padding: 26px 28px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    overflow: hidden;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    color: var(--ink);
+  }
+  .card::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.24s ease;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-4px);
+    border-color: var(--ink);
+    box-shadow: 0 20px 40px -26px rgba(40,30,15,0.55);
+    outline: none;
+  }
+  .card:hover::before, .card:focus-visible::before { transform: scaleX(1); }
+  .card .c-motif {
+    position: absolute;
+    top: 14px; right: 18px;
+    font-size: 46px;
+    line-height: 1;
+    opacity: 0.16;
+    filter: grayscale(0.2);
+    pointer-events: none;
+  }
+  .card .c-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+  }
+  .card .c-title {
+    font-family: var(--serif);
+    font-size: clamp(30px, 3.4vw, 38px);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .card .c-kicker {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: -4px;
+  }
+  .card .c-desc {
+    font-family: var(--sans);
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 2px 0 0;
+    max-width: 46ch;
+  }
+  .card .c-enter {
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .c-enter .arr { transition: transform 0.18s ease; }
+  .card:hover .c-enter .arr, .card:focus-visible .c-enter .arr { transform: translateX(5px); }
+
+  .home-foot {
+    margin-top: clamp(40px, 5vw, 60px);
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+  }
+  .home-foot strong { color: var(--ink); font-weight: 600; }
+  .home-foot a { color: var(--accent); text-decoration: none; }
+  .home-foot a:hover { text-decoration: underline; }
+
+  /* narrow screens */
+  @media (max-width: 860px) {
+    .brand { flex: 1 1 100%; border-right: none; border-bottom: 1px solid var(--line); }
+    .meta { display: none; }
+    .tab .t-tag { display: none; }
+    .tab .t-name { font-size: 17px; }
+  }
+  @media (max-width: 720px) {
+    .cards { grid-template-columns: 1fr; }
+  }
+
+  noscript .ns {
+    max-width: 640px; margin: 60px auto; padding: 0 24px;
+    font-family: var(--sans); color: var(--ink);
+  }
+  noscript a { color: var(--accent); }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand is-home" id="brand" type="button" title="Back to the overview">
+      <span class="eyebrow"><span class="home-dot"></span>An LLM scale exhibition</span>
+      <span class="wordmark">Behind the <em>chat&nbsp;box</em></span>
+    </button>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Visualizations">
+      <button class="tab" role="tab" data-key="parameters" aria-selected="false" aria-controls="frame-parameters" tabindex="-1">
+        <span class="t-num">01</span>
+        <span class="t-name">Parameters</span>
+        <span class="t-tag">From 1 to 2 trillion — how big the models are</span>
+      </button>
+      <button class="tab" role="tab" data-key="context" aria-selected="false" aria-controls="frame-context" tabindex="-1">
+        <span class="t-num">02</span>
+        <span class="t-name">Context</span>
+        <span class="t-tag">How much a model reads at once</span>
+      </button>
+      <button class="tab" role="tab" data-key="pricing" aria-selected="false" aria-controls="frame-pricing" tabindex="-1">
+        <span class="t-num">03</span>
+        <span class="t-name">Receipts</span>
+        <span class="t-tag">What a million tokens actually costs</span>
+      </button>
+      <button class="tab" role="tab" data-key="fuel" aria-selected="false" aria-controls="frame-fuel" tabindex="-1">
+        <span class="t-num">04</span>
+        <span class="t-name">Fuel&nbsp;Station</span>
+        <span class="t-tag">Fuel models — compare speed, price &amp; cost</span>
+      </button>
+    </nav>
+
+    <div class="meta" id="meta">
+      <a class="standalone" id="standalone" href="parameters/index.html" target="_blank" rel="noopener">Open standalone&nbsp;↗</a>
+      <span class="hint"><kbd>1</kbd>–<kbd>4</kbd> · <kbd>esc</kbd> home</span>
+    </div>
+  </header>
+
+  <main class="viewport" id="viewport">
+    <!-- Home / landing -->
+    <section class="frame home is-active" id="frame-home" data-key="home" aria-label="Overview">
+      <div class="home-inner">
+        <header class="hero">
+          <p class="eyebrow"><span class="live-dot"></span>An LLM scale exhibition · self-updating data</p>
+          <h1 class="hero-title">Behind the <em>chat&nbsp;box</em></h1>
+          <p class="hero-deck">
+            This is an interactive data-visualisation website that turns the vast, abstract
+            metrics of large language models into <b>four playful visualisations</b> — each
+            making one dimension of a model's capability something you can grasp intuitively
+            rather than read off a number.
+          </p>
+          <div class="hero-body">
+            <p>
+              The data updates itself, drawn from the <b>LLM&nbsp;Stats API</b>, which gathers
+              the pricing, benchmarks, rankings and metadata of hundreds of models. By querying
+              the API directly and fetching through a <b>GitHub&nbsp;Action</b>, the page
+              refreshes on its own whenever a new model appears, always showing the latest state
+              of the race. Models with missing information are dropped, so every comparison stays
+              trustworthy.
+            </p>
+            <p>
+              Its subject is the model race as it stands now — a new release every few days, each
+              claiming to be cheaper and stronger. We move toward the future it points to only
+              half-understanding it: one increasingly assisted, then led, by AI. There, the tool
+              that helps you make every decision, write every line of code and finish every
+              assignment is governed by costs and capabilities buried under numbers in the
+              millions and billions, the real ability behind them out of sight.
+            </p>
+            <p>
+              Critically, the work takes issue with an industry that teaches its users almost
+              nothing — what has changed, how one model differs from another. Knowing next to
+              nothing, people end up bound to whatever model an app, a default or a habit hands
+              them. That is no choice at all: a development racing ahead of the very understanding
+              its users would need, leaving them behind.
+            </p>
+            <p>
+              Its intended impact is not grand but real: to hand the hidden information back to
+              ordinary users, so they can compare models themselves and, in a world AI will come
+              to lead, choose the one that suits them best — closing the gap so they can pick the
+              model that will carry their memories, their work, even their life.
+            </p>
+          </div>
+          <!-- TODO: replace USER/REPO below with your real GitHub repository -->
+          <div class="hero-cta">
+            <a class="gh-link" href="https://github.com/USER/REPO" target="_blank" rel="noopener">
+              <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+              <span>View source on GitHub&nbsp;↗</span>
+            </a>
+          </div>
+          <div class="hero-foot">
+            <span>Four playful visualisations</span>
+            <span>Self-updating · LLM&nbsp;Stats API</span>
+            <span>Refreshed via GitHub&nbsp;Action</span>
+          </div>
+        </header>
+
+        <p class="section-label">The four rooms ↓</p>
+        <nav class="cards" aria-label="Choose a visualization">
+          <button class="card" data-key="parameters" type="button">
+            <span class="c-motif">📐</span>
+            <span class="c-num">01</span>
+            <h2 class="c-title">Parameters</h2>
+            <span class="c-kicker">From 1 to 2 trillion</span>
+            <p class="c-desc">Every weight in a neural network is a single number. See a model's
+              parameter count laid on the same line as the words in books you know — from one
+              printed page to the whole Library of Congress.</p>
+            <span class="c-enter">Enter the room <span class="arr">→</span></span>
+          </button>
+
+          <button class="card" data-key="context" type="button">
+            <span class="c-motif">📖</span>
+            <span class="c-num">02</span>
+            <h2 class="c-title">Context</h2>
+            <span class="c-kicker">How much it reads at once</span>
+            <p class="c-desc">A context window is how much text a model can hold in mind at one
+              time. Read each window as books — a 128K window is about one Hobbit; the longest
+              take in the entire Harry Potter series in a single prompt.</p>
+            <span class="c-enter">Enter the room <span class="arr">→</span></span>
+          </button>
+
+          <button class="card" data-key="pricing" type="button">
+            <span class="c-motif">🧾</span>
+            <span class="c-num">03</span>
+            <h2 class="c-title">Receipts</h2>
+            <span class="c-kicker">What a million tokens costs</span>
+            <p class="c-desc">A printed receipt for every model's price. Pick a task, sort
+              cheapest-first, and watch the totals print — the real, everyday economics of
+              calling an AI by the token.</p>
+            <span class="c-enter">Enter the room <span class="arr">→</span></span>
+          </button>
+
+          <button class="card" data-key="fuel" type="button">
+            <span class="c-motif">⛽</span>
+            <span class="c-num">04</span>
+            <h2 class="c-title">Fuel Station</h2>
+            <span class="c-kicker">Fill up &amp; compare</span>
+            <p class="c-desc">A golden-hour gas station where you fuel models like cars. Compare
+              their speed, price and IQ, collect receipts, and grow a robot a brain. The playful
+              one — same numbers, at play.</p>
+            <span class="c-enter">Enter the room <span class="arr">→</span></span>
+          </button>
+        </nav>
+
+        <footer class="home-foot">
+          <strong>ABOUT</strong> · Four originally-standalone pages, unified into one exhibition.
+          Each runs in its own isolated frame so its live data, filters, and interactions stay
+          fully intact. Data: <a href="https://docs.llm-stats.com/api-reference/introduction" target="_blank" rel="noopener">LLM&nbsp;Stats API</a>
+          (with embedded snapshots as fallback). Source: <a href="https://github.com/USER/REPO" target="_blank" rel="noopener">GitHub&nbsp;↗</a>.
+          Type: Instrument&nbsp;Serif · JetBrains&nbsp;Mono · Inter.
+        </footer>
+      </div>
+    </section>
+
+    <!-- Visualization frames (lazy-mounted on first visit) -->
+    <div class="frame" id="frame-parameters" role="tabpanel" data-key="parameters" aria-label="Parameters">
+      <div class="loader"><span class="dot"></span><span class="lbl">Loading · Parameters</span></div>
+      <iframe data-src="parameters/index.html" title="From 1 to 2 trillion — a tour through LLM parameter counts" loading="lazy"></iframe>
+    </div>
+    <div class="frame" id="frame-context" role="tabpanel" data-key="context" aria-label="Context">
+      <div class="loader"><span class="dot"></span><span class="lbl">Loading · Context</span></div>
+      <iframe data-src="context/index.html" title="How much can a model read at once — a tour through LLM context windows" loading="lazy"></iframe>
+    </div>
+    <div class="frame" id="frame-pricing" role="tabpanel" data-key="pricing" aria-label="Receipts">
+      <div class="loader"><span class="dot"></span><span class="lbl">Loading · Receipts</span></div>
+      <iframe data-src="input/index.html" title="Receipts — AI Pricing Archive" loading="lazy"></iframe>
+    </div>
+    <div class="frame" id="frame-fuel" role="tabpanel" data-key="fuel" aria-label="Fuel Station">
+      <div class="loader"><span class="dot"></span><span class="lbl">Loading · Fuel Station</span></div>
+      <iframe data-src="fuel-station-gh/index.html" title="AI Fuel Station" loading="lazy"></iframe>
+    </div>
+  </main>
+
+  <noscript>
+    <div class="ns">
+      <h1>Behind the chat box</h1>
+      <p>This page combines four visualizations. Enable JavaScript to switch between them, or open each directly:</p>
+      <ul>
+        <li><a href="parameters/index.html">01 · Parameters</a></li>
+        <li><a href="context/index.html">02 · Context</a></li>
+        <li><a href="input/index.html">03 · Receipts</a></li>
+        <li><a href="fuel-station-gh/index.html">04 · Fuel Station</a></li>
+      </ul>
+    </div>
+  </noscript>
+
+  <script>
+    // One landing page + four standalone visualizations, each isolated in its own
+    // iframe so their CSS / JS / IDs never collide. Iframes mount lazily on first
+    // visit and stay alive, so each view keeps its state (filters, game progress)
+    // when you leave and come back.
+    const VIEWS = [
+      { key: "parameters", url: "parameters/index.html" },
+      { key: "context",    url: "context/index.html" },
+      { key: "pricing",    url: "input/index.html" },
+      { key: "fuel",       url: "fuel-station-gh/index.html" },
+    ];
+    const ROUTES = ["home", ...VIEWS.map((v) => v.key)];
+    const urlByKey = Object.fromEntries(VIEWS.map((v) => [v.key, v.url]));
+
+    const brand = document.getElementById("brand");
+    const meta = document.getElementById("meta");
+    const standalone = document.getElementById("standalone");
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const frames = Array.from(document.querySelectorAll(".frame"));
+    const tabByKey = Object.fromEntries(tabs.map((t) => [t.dataset.key, t]));
+    const frameByKey = Object.fromEntries(frames.map((f) => [f.dataset.key, f]));
+
+    let current = null;
+    let routing = false; // guard against hashchange ↔ setHash feedback loop
+
+    function mount(frame) {
+      const iframe = frame.querySelector("iframe");
+      if (iframe && !iframe.src && iframe.dataset.src) {
+        iframe.addEventListener("load", () => frame.classList.add("loaded"), { once: true });
+        iframe.src = iframe.dataset.src;
+      }
+    }
+
+    function activate(key, { push = true } = {}) {
+      if (!ROUTES.includes(key)) key = "home";
+      if (key === current) return;
+      current = key;
+      const isHome = key === "home";
+
+      frames.forEach((f) => f.classList.toggle("is-active", f.dataset.key === key));
+      tabs.forEach((t) => {
+        const on = t.dataset.key === key;
+        t.setAttribute("aria-selected", String(on));
+        t.tabIndex = on ? 0 : -1;
+      });
+      brand.classList.toggle("is-home", isHome);
+
+      if (!isHome) mount(frameByKey[key]);   // boot the frame while it is visible
+
+      meta.style.display = isHome ? "none" : "flex";
+      if (!isHome) standalone.href = urlByKey[key];
+
+      if (push) {
+        routing = true;
+        const target = isHome ? "" : key;
+        if (location.hash.slice(1) !== target) location.hash = target;
+        routing = false;
+      }
+      document.title = isHome
+        ? "Behind the chat box — four views on the numbers behind large language models"
+        : "Behind the chat box · " + tabByKey[key].querySelector(".t-name").textContent.trim();
+
+      // a fresh landing should start at the top
+      if (isHome) frameByKey.home.scrollTop = 0;
+    }
+
+    // clicks: brand → home, tabs + cards → views
+    brand.addEventListener("click", () => activate("home"));
+    document.getElementById("tabs").addEventListener("click", (e) => {
+      const tab = e.target.closest(".tab");
+      if (tab) activate(tab.dataset.key);
+    });
+    document.querySelector(".cards").addEventListener("click", (e) => {
+      const card = e.target.closest(".card");
+      if (card) activate(card.dataset.key);
+    });
+
+    // keyboard: 1–4 jump to a view, esc / 0 / h → home, ← → cycle everything
+    window.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= VIEWS.length) { activate(VIEWS[n - 1].key); tabByKey[VIEWS[n - 1].key].focus(); return; }
+      if (e.key === "Escape" || e.key === "0" || e.key === "h") { activate("home"); brand.focus(); return; }
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        const i = ROUTES.indexOf(current);
+        const next = (i + (e.key === "ArrowRight" ? 1 : ROUTES.length - 1) + ROUTES.length) % ROUTES.length;
+        activate(ROUTES[next]);
+        (next === 0 ? brand : tabByKey[ROUTES[next]]).focus();
+      }
+    });
+
+    // back/forward through the URL hash
+    window.addEventListener("hashchange", () => {
+      if (routing) return;
+      const key = location.hash.slice(1) || "home";
+      if (ROUTES.includes(key)) activate(key, { push: false });
+    });
+
+    // initial view: a deep-link hash wins; otherwise always greet with the homepage
+    const fromHash = location.hash.slice(1);
+    activate(ROUTES.includes(fromHash) ? fromHash : "home", { push: false });
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "ai-fuel-station",
+  "version": "1.0.0",
+  "description": "AI Fuel Station — visualize AI API pricing as a fuel station. Data from LLM Stats (prices, real output speed, LLM Stats Score as IQ).",
+  "scripts": {
+    "build": "node build-data.js",
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,458 @@
+{
+  "updatedAt": "2026-06-04T06:46:53.217Z",
+  "live": true,
+  "stationCount": 9,
+  "modelCount": 36,
+  "stations": [
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "models": [
+        {
+          "name": "Claude Opus 4.8",
+          "price": 25,
+          "inPrice": 5,
+          "iq": 68,
+          "speed": 65,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-05-28"
+        },
+        {
+          "name": "Claude Opus 4.7",
+          "price": 25,
+          "inPrice": 5,
+          "iq": 61,
+          "speed": 7,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-04-16"
+        },
+        {
+          "name": "Claude Opus 4.6",
+          "price": 25,
+          "inPrice": 5,
+          "iq": 57,
+          "speed": 20,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-02-05"
+        },
+        {
+          "name": "Claude Sonnet 4.6",
+          "price": 15,
+          "inPrice": 3,
+          "iq": 50,
+          "speed": 28,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-02-17"
+        },
+        {
+          "name": "Claude Sonnet 4.5",
+          "price": 15,
+          "inPrice": 3,
+          "iq": 38,
+          "speed": 118,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-09-29"
+        },
+        {
+          "name": "Claude Haiku 4.5",
+          "price": 5,
+          "inPrice": 1,
+          "iq": 23,
+          "speed": 136,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-10-15"
+        }
+      ],
+      "color": {
+        "body": "#d97757",
+        "dark": "#a14d2f"
+      }
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "models": [
+        {
+          "name": "GPT-5.5",
+          "price": 30,
+          "inPrice": 5,
+          "iq": 63,
+          "speed": 39,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-04-23"
+        },
+        {
+          "name": "GPT-5.4",
+          "price": 15,
+          "inPrice": 2.5,
+          "iq": 60,
+          "speed": 188,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-03-05"
+        },
+        {
+          "name": "GPT-5.2",
+          "price": 14,
+          "inPrice": 1.75,
+          "iq": 56,
+          "speed": 172,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-12-11"
+        },
+        {
+          "name": "GPT-5.1",
+          "price": 10,
+          "inPrice": 1.25,
+          "iq": 54,
+          "speed": 160,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-11-13"
+        },
+        {
+          "name": "GPT-5.1 Instant",
+          "price": 10,
+          "inPrice": 1.25,
+          "iq": 52,
+          "speed": 31,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-11-12"
+        },
+        {
+          "name": "GPT-5.4 mini",
+          "price": 4.5,
+          "inPrice": 0.75,
+          "iq": 49,
+          "speed": 562,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-03-17"
+        },
+        {
+          "name": "GPT-5.5 Instant",
+          "price": 30,
+          "inPrice": 5,
+          "iq": 44,
+          "speed": 200,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-05-05"
+        },
+        {
+          "name": "GPT-5.3 Codex",
+          "price": 14,
+          "inPrice": 1.75,
+          "iq": 43,
+          "speed": 165,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-02-05"
+        },
+        {
+          "name": "GPT-5.4 nano",
+          "price": 1.25,
+          "inPrice": 0.2,
+          "iq": 40,
+          "speed": 151,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-03-17"
+        },
+        {
+          "name": "GPT-5 mini",
+          "price": 2,
+          "inPrice": 0.25,
+          "iq": 36,
+          "speed": 174,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-08-07"
+        }
+      ],
+      "color": {
+        "body": "#1aa37a",
+        "dark": "#0c6a4d"
+      }
+    },
+    {
+      "id": "google",
+      "name": "Google",
+      "models": [
+        {
+          "name": "Gemini 3.5 Flash",
+          "price": 9,
+          "inPrice": 1.5,
+          "iq": 59,
+          "speed": 175,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-05-19"
+        },
+        {
+          "name": "Gemini 3.1 Pro",
+          "price": 15,
+          "inPrice": 2.5,
+          "iq": 58,
+          "speed": 39,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-02-19"
+        },
+        {
+          "name": "Gemini 3 Flash",
+          "price": 3,
+          "inPrice": 0.5,
+          "iq": 55,
+          "speed": 494,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-12-17"
+        },
+        {
+          "name": "Gemini 3.1 Flash-Lite",
+          "price": 1.5,
+          "inPrice": 0.25,
+          "iq": 45,
+          "speed": 175,
+          "isEstSpeed": true,
+          "open": false,
+          "release": "2026-03-03"
+        },
+        {
+          "name": "Gemini 2.5 Pro",
+          "price": 10,
+          "inPrice": 1.25,
+          "iq": 37,
+          "speed": 233,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-05-20"
+        },
+        {
+          "name": "Gemini 2.5 Flash",
+          "price": 2.5,
+          "inPrice": 0.3,
+          "iq": 28,
+          "speed": 31,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-05-20"
+        }
+      ],
+      "color": {
+        "body": "#4a8df0",
+        "dark": "#2a5fb0"
+      }
+    },
+    {
+      "id": "moonshotai",
+      "name": "Moonshot",
+      "models": [
+        {
+          "name": "Kimi K2.6",
+          "price": 4,
+          "inPrice": 0.95,
+          "iq": 57,
+          "speed": 38,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2026-04-20"
+        }
+      ],
+      "color": {
+        "body": "#5a4ad1",
+        "dark": "#332a8f"
+      }
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen",
+      "models": [
+        {
+          "name": "Qwen3.7 Max",
+          "price": 3.75,
+          "inPrice": 1.25,
+          "iq": 56,
+          "speed": 34,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2026-05-19"
+        },
+        {
+          "name": "Qwen3.6 Plus",
+          "price": 3,
+          "inPrice": 0.5,
+          "iq": 52,
+          "speed": 150,
+          "isEstSpeed": true,
+          "open": false,
+          "release": "2026-03-31"
+        }
+      ],
+      "color": {
+        "body": "hsl(16 55% 60%)",
+        "dark": "hsl(16 55% 32%)"
+      }
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "models": [
+        {
+          "name": "DeepSeek-V4-Pro-Max",
+          "price": 3.48,
+          "inPrice": 1.74,
+          "iq": 51,
+          "speed": 145,
+          "isEstSpeed": true,
+          "open": true,
+          "release": "2026-04-23"
+        },
+        {
+          "name": "DeepSeek-V4-Flash-Max",
+          "price": 0.28,
+          "inPrice": 0.14,
+          "iq": 42,
+          "speed": 45,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2026-04-23"
+        },
+        {
+          "name": "DeepSeek-R1-0528",
+          "price": 2.19,
+          "inPrice": 0.55,
+          "iq": 39,
+          "speed": 45,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2025-05-28"
+        },
+        {
+          "name": "DeepSeek-V3 0324",
+          "price": 1.14,
+          "inPrice": 0.28,
+          "iq": 18,
+          "speed": 71,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2025-03-25"
+        }
+      ],
+      "color": {
+        "body": "#3b6cd9",
+        "dark": "#234080"
+      }
+    },
+    {
+      "id": "zai-org",
+      "name": "Zhipu",
+      "models": [
+        {
+          "name": "GLM-5.1",
+          "price": 4.4,
+          "inPrice": 1.4,
+          "iq": 46,
+          "speed": 60,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2026-04-07"
+        }
+      ],
+      "color": {
+        "body": "#22a39f",
+        "dark": "#13615e"
+      }
+    },
+    {
+      "id": "xai",
+      "name": "xAI",
+      "models": [
+        {
+          "name": "Grok 4 Fast",
+          "price": 0.5,
+          "inPrice": 0.2,
+          "iq": 45,
+          "speed": 111,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-08-28"
+        },
+        {
+          "name": "Grok-3",
+          "price": 15,
+          "inPrice": 3,
+          "iq": 39,
+          "speed": 196,
+          "isEstSpeed": false,
+          "open": false,
+          "release": "2025-02-17"
+        }
+      ],
+      "color": {
+        "body": "#cfcfd4",
+        "dark": "#888893"
+      }
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "models": [
+        {
+          "name": "MiniMax M2.7",
+          "price": 1.2,
+          "inPrice": 0.3,
+          "iq": 44,
+          "speed": 87,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2026-03-18"
+        },
+        {
+          "name": "MiniMax M2.1",
+          "price": 1.2,
+          "inPrice": 0.3,
+          "iq": 40,
+          "speed": 296,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2025-12-23"
+        },
+        {
+          "name": "MiniMax M2",
+          "price": 1.2,
+          "inPrice": 0.3,
+          "iq": 34,
+          "speed": 28,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2025-10-27"
+        },
+        {
+          "name": "MiniMax M2.5",
+          "price": 1.2,
+          "inPrice": 0.3,
+          "iq": 1,
+          "speed": 432,
+          "isEstSpeed": false,
+          "open": true,
+          "release": "2026-02-12"
+        }
+      ],
+      "color": {
+        "body": "#e2614a",
+        "dark": "#9c3324"
+      }
+    }
+  ]
+}
